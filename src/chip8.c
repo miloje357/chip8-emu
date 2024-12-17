@@ -119,6 +119,100 @@ void add_immediate(unsigned short opcode) {
 	printf("EXECUTED: ADD V%x, %x\n", THIRD_DEG(opcode), IMMEDIATE(opcode));
 }
 
+void load_reg(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)];
+	printf("EXECUTED: LD V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void or_reg(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] |= V[(int)SECOND_DEG(opcode)];
+	printf("EXECUTED: OR V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void and_reg(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] &= V[(int)SECOND_DEG(opcode)];
+	printf("EXECUTED: AND V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void xor_reg(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] ^= V[(int)SECOND_DEG(opcode)];
+	printf("EXECUTED: XOR V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void add_reg(unsigned short opcode) {
+	int sum = V[(int)THIRD_DEG(opcode)] + V[(int)SECOND_DEG(opcode)];
+	if (sum > 0xff) {
+		V[0xF] = 1;
+	}
+	V[(int)THIRD_DEG(opcode)] = sum;
+	printf("EXECUTED: ADD V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+
+void subtract_reg(unsigned short opcode) {
+	int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
+	if (diff >= 0) {
+		V[0xF] = 1;
+	}
+	V[(int)THIRD_DEG(opcode)] = diff;
+	printf("EXECUTED: SUB V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void shift_right_reg(unsigned short opcode) {
+	V[0xF] = V[(int)SECOND_DEG(opcode)] & 0x01;
+	V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] >> 1;
+	printf("EXECUTED: SHR V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+
+void subtract_negated_reg(unsigned short opcode) {
+	int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
+	if (diff < 0) {
+		V[0xF] = 1;
+	}
+	V[(int)THIRD_DEG(opcode)] = -diff;
+	printf("EXECUTED: SUBN V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void shift_left_reg(unsigned short opcode) {
+	V[0xF] = (V[(int)SECOND_DEG(opcode)] & 0x80) >> 7;
+	V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] << 1;
+	printf("EXECUTED: SHL V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+instruction decode8(unsigned short opcode) {
+	switch (FIRST_DEG(opcode)) {
+		case 0:
+			printf("DECODED: LD Vx, Vy\n");
+			return &load_reg;
+		case 1:
+			printf("DECODED: OR Vx, Vy\n");
+			return &or_reg;
+		case 2:
+			printf("DECODED: AND Vx, Vy\n");
+			return &and_reg;
+		case 3:
+			printf("DECODED: XOR Vx, Vy\n");
+			return &xor_reg;
+		case 4:
+			printf("DECODED: ADD Vx, Vy\n");
+			return &add_reg;
+		case 5:
+			printf("DECODED: SUB Vx, Vy\n");
+			return &subtract_reg;
+		case 6:
+			printf("DECODED: SHR Vx, Vy\n");
+			return &shift_right_reg;
+		case 7:
+			printf("DECODED: SUBN Vx, Vy\n");
+			return &subtract_negated_reg;
+		case 0xE:
+			printf("DECODED: SHL Vx, Vy\n");
+			return &shift_left_reg;
+	}
+	return NULL;
+}
+
 instruction decode(unsigned short opcode) {
 	switch (FOURTH_DEG(opcode)) {
 		case 1:
@@ -142,17 +236,21 @@ instruction decode(unsigned short opcode) {
 		case 7:
 			printf("DECODED: ADD Vx, byte\n");
 			return &add_immediate;
+		case 8:
+			return decode8(opcode);
 	}
 	printf("DECODED: Illegal opcode\n");
 	return NULL;
 }
 
-int next_cycle() {
+void next_cycle() {
 	unsigned static short opcode;
 	instruction static inst;
 	if (inst == NULL && clock == 2) {
 		printf("Illegal opcode\n");
-		return 1;
+		clock++;
+		clock %= 3;
+		return;
 	}
 	switch (clock) {
 		case 0:
@@ -168,5 +266,4 @@ int next_cycle() {
 	}
 	clock++;
 	clock %= 3;
-	return 0;
 }

@@ -20,11 +20,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	while (1) {
-		status = next_cycle();
-		if (status == 1) {
-			printf("Exiting...\n");
-			return 1;
-		}
+		next_cycle();
 		printf("\n");
 		// Display graphics
 		print_state();
