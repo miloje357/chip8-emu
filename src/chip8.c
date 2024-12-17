@@ -4,15 +4,19 @@
 #define STACK_END 0xea0
 #define STACK_START 0xeff
 
+typedef void (*instruction)(unsigned short);
+
 unsigned char memory[4096];
 unsigned short *stack = (unsigned short *)memory + STACK_END + 0xff;
 unsigned char V[16];
 unsigned short pc;
 unsigned char sp;
+unsigned char clock;
 
 void init_chip8() {
 	pc = PROGRAM_START;
 	sp = 0xff;
+	clock = 0;
 }
 
 int write_byte_to_memory(char byte, short addr) {
@@ -68,4 +72,51 @@ void print_state() {
 
 	printf("Stack pointer:   %02x\n", sp);
 	printf("Program counter: %04x\n", pc);
+}
+
+unsigned short fetch() {
+	unsigned short opcode;
+	opcode = memory[pc] << 8;
+	opcode += memory[pc + 1];
+	pc += 2;
+	return opcode;
+}
+
+void load(unsigned short opcode) {
+	char register_num = (opcode & 0x0100) >> 8;
+	char value = opcode & 0xff;
+	V[(int)register_num] = value;
+	printf("EXECUTED: LD V%x, %x\n", (int)register_num, (int)value);
+}
+
+instruction decode(unsigned short opcode) {
+	if (opcode & 0x6000) {
+		printf("DECODED: LD\n");
+		return &load;
+	}
+	return NULL;
+}
+
+int next_cycle() {
+	unsigned static short opcode;
+	instruction static inst;
+	if (inst == NULL && clock == 2) {
+		printf("Ilegal opcode\n");
+		return 1;
+	}
+	switch (clock) {
+		case 0:
+			opcode = fetch();
+			printf("FETCHED: %04x\n", opcode);
+			break;
+		case 1:
+			inst = decode(opcode);
+			break;
+		case 2:
+			inst(opcode);
+			break;
+	}
+	clock++;
+	clock %= 3;
+	return 0;
 }

@@ -20,7 +20,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	while (1) {
-		// Next clock cycle
+		status = next_cycle();
+		if (status == 1) {
+			printf("Exiting...\n");
+			return 1;
+		}
+		printf("\n");
 		// Display graphics
 		print_state();
 		fgetc(stdin);
