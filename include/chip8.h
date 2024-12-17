@@ -2,5 +2,7 @@
 #define CHIP8_H_
 
 int load_program(const char* program_path);
+void print_state();
+void init_chip8();
 
 #endif

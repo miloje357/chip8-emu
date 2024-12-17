@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	// Init processor
+	init_chip8();
 	// Init graphics
 	status = load_program(argv[1]);
 	if (status == 1) {
@@ -22,7 +22,9 @@ int main(int argc, char *argv[]) {
 	while (1) {
 		// Next clock cycle
 		// Display graphics
-		usleep(1.0 / (CLOCK_CYCLE * 1000000));
+		print_state();
+		fgetc(stdin);
+		// usleep(1.0 / (CLOCK_CYCLE * 1000000));
 	}
 	return 0;
 }
