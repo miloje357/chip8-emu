@@ -1,8 +1,15 @@
 #include <stdio.h>
+#include <stdbool.h>
 
 #define PROGRAM_START 0x200
 #define STACK_END 0xea0
 #define STACK_START 0xeff
+#define FIRST_DEG(opcode) opcode & 0x000f
+#define SECOND_DEG(opcode) (opcode & 0x00f0) >> 4
+#define THIRD_DEG(opcode) (opcode & 0x0f00) >> 8
+#define FOURTH_DEG(opcode) (opcode & 0xf000) >> 12
+#define IMMEDIATE(opcode) opcode & 0x00ff
+#define ADDR(opcode) opcode & 0x0fff
 
 typedef void (*instruction)(unsigned short);
 
@@ -19,36 +26,30 @@ void init_chip8() {
 	clock = 0;
 }
 
-int write_byte_to_memory(char byte, short addr) {
-	if (addr < PROGRAM_START) {
-		printf("Error writing to address %04x\n", addr);
-		return 1;
-	}
-	if (addr >= STACK_END) {
-		printf("Error writing to address %04x\n", addr);
-		return 1;
-	}
-	memory[addr] = byte;
-	return 0;
-}
-
 int load_program(const char* program_path) {
-	int status = 0;
 	FILE *program = fopen(program_path, "r");
 	if (program == NULL) {
 		printf("Error loading %s.\n", program_path);
 		return 1;
 	}
 
-	char byte_read = fgetc(program);
-	short addr = PROGRAM_START;
-	while (byte_read != EOF && status == 0) {
-		status = write_byte_to_memory(byte_read, addr);
-		byte_read = fgetc(program);
-		addr++;
+	fseek(program, 0, SEEK_END);
+	int filesize = ftell(program);
+	if (filesize == -1) {
+		printf("Couldn't determine file size.\n");
+		fclose(program);
+		return 1;
 	}
-	if (status == 1) {
-		printf("Program too large!\n");
+	if (filesize >= STACK_END - PROGRAM_START) {
+		printf("Program too large.\n");
+		fclose(program);
+		return 1;
+	}
+	fseek(program, 0, SEEK_SET);
+	size_t bytes_read = fread(memory + PROGRAM_START, 1, filesize, program);
+	if (bytes_read != filesize) {
+		printf("Error reading file\n");
+		fclose(program);
 		return 1;
 	}
 
@@ -82,18 +83,67 @@ unsigned short fetch() {
 	return opcode;
 }
 
-void load(unsigned short opcode) {
-	char register_num = (opcode & 0x0100) >> 8;
-	char value = opcode & 0xff;
-	V[(int)register_num] = value;
-	printf("EXECUTED: LD V%x, %x\n", (int)register_num, (int)value);
+void jump(unsigned short opcode) {
+	pc = ADDR(opcode);
+	printf("EXECUTED: JP %04x\n", pc);
+}
+
+void skip_equal_immediate(unsigned short opcode) {
+	if (V[(int)THIRD_DEG(opcode)] == (IMMEDIATE(opcode))) {
+		pc += 2;
+	}
+	printf("EXECUTED: SE V%x, %x\n", THIRD_DEG(opcode), IMMEDIATE(opcode));
+}
+
+void skip_not_equal_immediate(unsigned short opcode) {
+	if (V[(int)THIRD_DEG(opcode)] != (IMMEDIATE(opcode))) {
+		pc += 2;
+	}
+	printf("EXECUTED: SNE V%x, %x\n", THIRD_DEG(opcode), IMMEDIATE(opcode));
+}
+
+void skip_equal_reg(unsigned short opcode) {
+	if (V[(int)THIRD_DEG(opcode)] == V[(int)SECOND_DEG(opcode)]) {
+		pc += 2;
+	}
+	printf("EXECUTED: SE V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void load_immediate(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] = IMMEDIATE(opcode);
+	printf("EXECUTED: LD V%x, %x\n", THIRD_DEG(opcode), IMMEDIATE(opcode));
+}
+
+void add_immediate(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] += IMMEDIATE(opcode);
+	printf("EXECUTED: ADD V%x, %x\n", THIRD_DEG(opcode), IMMEDIATE(opcode));
 }
 
 instruction decode(unsigned short opcode) {
-	if (opcode & 0x6000) {
-		printf("DECODED: LD\n");
-		return &load;
+	switch (FOURTH_DEG(opcode)) {
+		case 1:
+			printf("DECODED: JP addr\n");
+			return &jump;
+		case 3:
+			printf("DECODED: SE Vx, byte\n");
+			return &skip_equal_immediate;
+		case 4:
+			printf("DECODED: SNE Vx, byte\n");
+			return &skip_not_equal_immediate;
+		case 5:
+			if ((FIRST_DEG(opcode)) != 0) {
+				return NULL;
+			}
+			printf("DECODED: SE Vx, Vy\n");
+			return &skip_equal_reg;
+		case 6:
+			printf("DECODED: LD Vx, byte\n");
+			return &load_immediate;
+		case 7:
+			printf("DECODED: ADD Vx, byte\n");
+			return &add_immediate;
 	}
+	printf("DECODED: Illegal opcode\n");
 	return NULL;
 }
 
@@ -101,7 +151,7 @@ int next_cycle() {
 	unsigned static short opcode;
 	instruction static inst;
 	if (inst == NULL && clock == 2) {
-		printf("Ilegal opcode\n");
+		printf("Illegal opcode\n");
 		return 1;
 	}
 	switch (clock) {
