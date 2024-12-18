@@ -3,8 +3,8 @@
 #include <stdbool.h>
 
 #define PROGRAM_START 0x200
-#define STACK_START 0xeff
-#define STACK_END 0xedf
+#define STACK_START 0xedf
+#define STACK_END 0xeff
 #define FIRST_DEG(opcode) opcode & 0x000f
 #define SECOND_DEG(opcode) (opcode & 0x00f0) >> 4
 #define THIRD_DEG(opcode) (opcode & 0x0f00) >> 8
@@ -23,7 +23,7 @@ unsigned short I;
 
 void init_chip8() {
 	pc = PROGRAM_START;
-	sp = 0xff;
+	sp = 0;
 	clock = 0;
 }
 
@@ -67,7 +67,7 @@ void print_state() {
 	printf("\n");
 
 	printf("Stack:           ");
-	for (int i = STACK_START - 1; i > STACK_END; i -= 2) {
+	for (int i = STACK_START + 2; i <= STACK_END; i += 2) {
 		printf("%04x ", *(unsigned short *)(memory + i));
 	}
 	printf("\n");
@@ -85,13 +85,22 @@ unsigned short fetch() {
 	return opcode;
 }
 
-void no_operation(unsigned short opcode) {
-	printf("EXECUTED: NOP\n");
+void return_op(unsigned short opcode) {
+	pc = *(unsigned short *)(memory + STACK_START + sp);
+	sp -= 2;
+	printf("EXECUTED: RET\n");
 }
 
 void jump(unsigned short opcode) {
 	pc = ADDR(opcode);
 	printf("EXECUTED: JP %04x\n", pc);
+}
+
+void call(unsigned short opcode) {
+	sp += 2;
+	*(unsigned short *)(memory + STACK_START + sp) = pc;
+	pc = ADDR(opcode);
+	printf("EXECUTED: CALL %04x\n", pc);
 }
 
 void skip_equal_immediate(unsigned short opcode) {
@@ -287,12 +296,12 @@ instruction decodef(unsigned short opcode) {
 
 instruction decode(unsigned short opcode) {
 	switch (FOURTH_DEG(opcode)) {
-		case 0:
-			printf("DECODED: NOP\n");
-			return &no_operation;
 		case 1:
 			printf("DECODED: JP addr\n");
 			return &jump;
+		case 2:
+			printf("DECODED: CALL addr\n");
+			return &call;
 		case 3:
 			printf("DECODED: SE Vx, byte\n");
 			return &skip_equal_immediate;
@@ -330,6 +339,11 @@ instruction decode(unsigned short opcode) {
 			return &random_reg;
 		case 0xF:
 			return decodef(opcode);
+	}
+	switch (opcode) {
+		case 0x00EE:
+			printf("DECODED: RET\n");
+			return &return_op;
 	}
 	printf("DECODED: Illegal opcode\n");
 	return NULL;
