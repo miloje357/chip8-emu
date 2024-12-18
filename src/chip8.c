@@ -1,9 +1,10 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 
 #define PROGRAM_START 0x200
-#define STACK_END 0xea0
 #define STACK_START 0xeff
+#define STACK_END 0xedf
 #define FIRST_DEG(opcode) opcode & 0x000f
 #define SECOND_DEG(opcode) (opcode & 0x00f0) >> 4
 #define THIRD_DEG(opcode) (opcode & 0x0f00) >> 8
@@ -14,11 +15,11 @@
 typedef void (*instruction)(unsigned short);
 
 unsigned char memory[4096];
-unsigned short *stack = (unsigned short *)memory + STACK_END + 0xff;
 unsigned char V[16];
 unsigned short pc;
 unsigned char sp;
 unsigned char clock;
+unsigned short I;
 
 void init_chip8() {
 	pc = PROGRAM_START;
@@ -66,13 +67,14 @@ void print_state() {
 	printf("\n");
 
 	printf("Stack:           ");
-	for (int i = 15; i >= 0; i--) {
-		printf("%04x ", stack[i]);
+	for (int i = STACK_START - 1; i > STACK_END; i -= 2) {
+		printf("%04x ", *(unsigned short *)(memory + i));
 	}
 	printf("\n");
 
 	printf("Stack pointer:   %02x\n", sp);
 	printf("Program counter: %04x\n", pc);
+	printf("Index register:  %04x\n", I);
 }
 
 unsigned short fetch() {
@@ -81,6 +83,10 @@ unsigned short fetch() {
 	opcode += memory[pc + 1];
 	pc += 2;
 	return opcode;
+}
+
+void no_operation(unsigned short opcode) {
+	printf("EXECUTED: NOP\n");
 }
 
 void jump(unsigned short opcode) {
@@ -180,6 +186,54 @@ void shift_left_reg(unsigned short opcode) {
 	printf("EXECUTED: SHL V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
 }
 
+void skip_not_equal_reg(unsigned short opcode) {
+	if (V[(int)THIRD_DEG(opcode)] != V[(int)SECOND_DEG(opcode)]) {
+		pc += 2;
+	}
+	printf("EXECUTED: SNE V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
+}
+
+void load_index(unsigned short opcode) {
+	I = ADDR(opcode);
+	printf("EXECUTED: LD I, %04x\n", I);
+}
+
+void jump_reg(unsigned short opcode) {
+	pc = (ADDR(opcode)) + V[0];
+	printf("EXECUTED: JP V0, %04x\n", ADDR(opcode));
+}
+
+void random_reg(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] = (rand() % 0x0100) & IMMEDIATE(opcode);
+	printf("EXECUTED: RND V%x, %02x\n", THIRD_DEG(opcode), IMMEDIATE(opcode));
+}
+
+void add_index_reg(unsigned short opcode) {
+	I += V[(int)THIRD_DEG(opcode)];
+	printf("EXECUTED: ADD I, V%x\n", THIRD_DEG(opcode));
+}
+
+void to_bcd(unsigned short opcode) {
+	int val = V[(int)THIRD_DEG(opcode)];
+	for (int i = 2; i >= 0; i--) {
+		memory[I + i] = val % 10;
+		val /= 10;
+	}
+	printf("EXECUTED: BCD V%x\n", THIRD_DEG(opcode));
+}
+
+void regs_to_memory(unsigned short opcode) {
+	for (int i = 0; i < THIRD_DEG(opcode); i++) {
+		memory[I + i] = V[i];
+	}
+}
+
+void memory_to_regs(unsigned short opcode) {
+	for (int i = 0; i < THIRD_DEG(opcode); i++) {
+		V[i] = memory[I + i];
+	}
+}
+
 instruction decode8(unsigned short opcode) {
 	switch (FIRST_DEG(opcode)) {
 		case 0:
@@ -213,8 +267,29 @@ instruction decode8(unsigned short opcode) {
 	return NULL;
 }
 
+instruction decodef(unsigned short opcode) {
+	switch (opcode & 0x00ff) {
+		case 0x1E:
+			printf("DECODED: ADD I, Vx\n");
+			return &add_index_reg;
+		case 0x33:
+			printf("DECODED: BCD Vx\n");
+			return &to_bcd;
+		case 0x55:
+			printf("DECODED: LD [I], Vx\n");
+			return &regs_to_memory;
+		case 0x65:
+			printf("DECODED: LD Vx, [I]\n");
+			return &memory_to_regs;
+	}
+	return NULL;
+}
+
 instruction decode(unsigned short opcode) {
 	switch (FOURTH_DEG(opcode)) {
+		case 0:
+			printf("DECODED: NOP\n");
+			return &no_operation;
 		case 1:
 			printf("DECODED: JP addr\n");
 			return &jump;
@@ -238,6 +313,23 @@ instruction decode(unsigned short opcode) {
 			return &add_immediate;
 		case 8:
 			return decode8(opcode);
+		case 9:
+			if ((FIRST_DEG(opcode)) != 0) {
+				return NULL;
+			}
+			printf("DECODED: SNE Vx, Vy\n");
+			return &skip_not_equal_reg;
+		case 0xA:
+			printf("DECODED: LD I, addr\n");
+			return &load_index;
+		case 0xB:
+			printf("DECODED: JP V0, addr\n");
+			return &jump_reg;
+		case 0xC:
+			printf("DECODED: RND Vx, byte\n");
+			return &random_reg;
+		case 0xF:
+			return decodef(opcode);
 	}
 	printf("DECODED: Illegal opcode\n");
 	return NULL;

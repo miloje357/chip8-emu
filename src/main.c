@@ -1,4 +1,6 @@
+#include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include <unistd.h>
 #include "chip8.h"
 
@@ -10,6 +12,9 @@ int main(int argc, char *argv[]) {
 		printf("Usage: ./chip8_emu <program_path>\n");
 		return 1;
 	}
+
+	// For RND instruction
+	srand(time(NULL));
 
 	init_chip8();
 	// Init graphics
