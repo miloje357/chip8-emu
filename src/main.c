@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "chip8.h"
 #include "debugger.h"
+#include "graphics.h"
 
 #define CLOCK_CYCLE 1.0 // in MHz
 
@@ -29,6 +30,10 @@ int main(int argc, char *argv[]) {
 	srand(time(NULL));
 
 	init_chip8();
+	if (!should_debug()) {
+		init_graphics();
+	}
+
 	status = load_program(program_path);
 	if (status == 1) {
 		printf("Exiting...\n");
@@ -47,5 +52,7 @@ int main(int argc, char *argv[]) {
 		next_cycle();
 		usleep(1.0 / (CLOCK_CYCLE * 1000000));
 	}
+
+	// TODO: Run endwin somewhere
 	return 0;
 }
