@@ -52,7 +52,6 @@ int main(int argc, char *argv[]) {
 		Flag flag = next_cycle();
 		if (flag == DRAW) draw(get_video_mem());
 		usleep(1.0 / (CLOCK_CYCLE * 1000000));
-		// fgetc(stdin);
 	}
 
 	// TODO: Run endwin somewhere

@@ -8,8 +8,8 @@
 #define ANSI_COLOR_RESET "\x1b[0m"
 
 #define PROGRAM_START 0x200
-#define STACK_START 0xedf
-#define STACK_END 0xeff
+#define STACK_START 0xee0
+#define STACK_END 0xf00
 #define START_VIDEO_MEM 0xf00
 #define FIRST_DEG(opcode) opcode & 0x000f
 #define SECOND_DEG(opcode) (opcode & 0x00f0) >> 4
@@ -45,7 +45,7 @@ unsigned char memory[4096] = {
 
 void init_chip8() {
 	pc = PROGRAM_START;
-	sp = 0;
+	sp = -2;
 }
 
 int load_program(const char* program_path) {
@@ -88,8 +88,8 @@ void print_state() {
 	printf("\n");
 
 	printf("Stack:           ");
-	for (int i = STACK_START + 2; i <= STACK_END; i += 2) {
-		if (i - STACK_START - 2 == sp) {
+	for (int i = STACK_START; i < STACK_END; i += 2) {
+		if (i - STACK_START == sp) {
 			printf(ANSI_COLOR_RED "%04x " ANSI_COLOR_RESET, *(unsigned short *)(memory + i));
 			continue;
 		}
@@ -297,12 +297,19 @@ Flag draw_op(unsigned short opcode) {
 	unsigned char vy = V[SECOND_DEG(opcode)];
 	unsigned char n = FIRST_DEG(opcode);
 	unsigned char *video_mem = memory + START_VIDEO_MEM;
+	V[0xF] = 0;
 	for (int i = 0; i < n; i++) {
 		unsigned short sprite_short = memory[I + i] << 8;
 		sprite_short >>= (vx % 8);
 		int x = (vx % 64) / 8;
 		int y = ((vy + i) % 32) * 8;
+		if ((video_mem[x + y] & sprite_short >> 8) != 0) {
+			V[0xF] = 1;
+		}
 		video_mem[x + y] ^= sprite_short >> 8;
+		if ((video_mem[(x + 1) % 8 + y] & sprite_short) != 0) {
+			V[0xF] = 1;
+		}
 		video_mem[(x + 1) % 8 + y] ^= sprite_short;
 	}
 	debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD_DEG(opcode), SECOND_DEG(opcode), n);
@@ -350,82 +357,84 @@ Flag memory_to_regs(unsigned short opcode) {
 instruction decode8(unsigned short opcode) {
 	switch (FIRST_DEG(opcode)) {
 		case 0:
-			debug_printf("DECODED: LD Vx, Vy\n");
+			debug_printf("DECODED:  LD Vx, Vy\n");
 			return &load_reg;
 		case 1:
-			debug_printf("DECODED: OR Vx, Vy\n");
+			debug_printf("DECODED:  OR Vx, Vy\n");
 			return &or_reg;
 		case 2:
-			debug_printf("DECODED: AND Vx, Vy\n");
+			debug_printf("DECODED:  AND Vx, Vy\n");
 			return &and_reg;
 		case 3:
-			debug_printf("DECODED: XOR Vx, Vy\n");
+			debug_printf("DECODED:  XOR Vx, Vy\n");
 			return &xor_reg;
 		case 4:
-			debug_printf("DECODED: ADD Vx, Vy\n");
+			debug_printf("DECODED:  ADD Vx, Vy\n");
 			return &add_reg;
 		case 5:
-			debug_printf("DECODED: SUB Vx, Vy\n");
+			debug_printf("DECODED:  SUB Vx, Vy\n");
 			return &subtract_reg;
 		case 6:
-			debug_printf("DECODED: SHR Vx, Vy\n");
+			debug_printf("DECODED:  SHR Vx, Vy\n");
 			return &shift_right_reg;
 		case 7:
-			debug_printf("DECODED: SUBN Vx, Vy\n");
+			debug_printf("DECODED:  SUBN Vx, Vy\n");
 			return &subtract_negated_reg;
 		case 0xE:
-			debug_printf("DECODED: SHL Vx, Vy\n");
+			debug_printf("DECODED:  SHL Vx, Vy\n");
 			return &shift_left_reg;
 	}
+	debug_printf("DECODED:  Illegal opcode\n");
 	return NULL;
 }
 
 instruction decodef(unsigned short opcode) {
 	switch (opcode & 0x00ff) {
 		case 0x1E:
-			debug_printf("DECODED: ADD I, Vx\n");
+			debug_printf("DECODED:  ADD I, Vx\n");
 			return &add_index_reg;
 		case 0x29:
-			debug_printf("DECODED: LD F, Vx\n");
+			debug_printf("DECODED:  LD F, Vx\n");
 			return &load_font;
 		case 0x33:
-			debug_printf("DECODED: BCD Vx\n");
+			debug_printf("DECODED:  BCD Vx\n");
 			return &to_bcd;
 		case 0x55:
-			debug_printf("DECODED: LD [I], Vx\n");
+			debug_printf("DECODED:  LD [I], Vx\n");
 			return &regs_to_memory;
 		case 0x65:
-			debug_printf("DECODED: LD Vx, [I]\n");
+			debug_printf("DECODED:  LD Vx, [I]\n");
 			return &memory_to_regs;
 	}
+	debug_printf("DECODED:  Illegal opcode\n");
 	return NULL;
 }
 
 instruction decode(unsigned short opcode) {
 	switch (FOURTH_DEG(opcode)) {
 		case 1:
-			debug_printf("DECODED: JP addr\n");
+			debug_printf("DECODED:  JP addr\n");
 			return &jump;
 		case 2:
-			debug_printf("DECODED: CALL addr\n");
+			debug_printf("DECODED:  CALL addr\n");
 			return &call;
 		case 3:
-			debug_printf("DECODED: SE Vx, byte\n");
+			debug_printf("DECODED:  SE Vx, byte\n");
 			return &skip_equal_immediate;
 		case 4:
-			debug_printf("DECODED: SNE Vx, byte\n");
+			debug_printf("DECODED:  SNE Vx, byte\n");
 			return &skip_not_equal_immediate;
 		case 5:
 			if ((FIRST_DEG(opcode)) != 0) {
 				return NULL;
 			}
-			debug_printf("DECODED: SE Vx, Vy\n");
+			debug_printf("DECODED:  SE Vx, Vy\n");
 			return &skip_equal_reg;
 		case 6:
-			debug_printf("DECODED: LD Vx, byte\n");
+			debug_printf("DECODED:  LD Vx, byte\n");
 			return &load_immediate;
 		case 7:
-			debug_printf("DECODED: ADD Vx, byte\n");
+			debug_printf("DECODED:  ADD Vx, byte\n");
 			return &add_immediate;
 		case 8:
 			return decode8(opcode);
@@ -433,32 +442,32 @@ instruction decode(unsigned short opcode) {
 			if ((FIRST_DEG(opcode)) != 0) {
 				return NULL;
 			}
-			debug_printf("DECODED: SNE Vx, Vy\n");
+			debug_printf("DECODED:  SNE Vx, Vy\n");
 			return &skip_not_equal_reg;
 		case 0xA:
-			debug_printf("DECODED: LD I, addr\n");
+			debug_printf("DECODED:  LD I, addr\n");
 			return &load_index;
 		case 0xB:
-			debug_printf("DECODED: JP V0, addr\n");
+			debug_printf("DECODED:  JP V0, addr\n");
 			return &jump_reg;
 		case 0xC:
-			debug_printf("DECODED: RND Vx, byte\n");
+			debug_printf("DECODED:  RND Vx, byte\n");
 			return &random_reg;
 		case 0xD:
-			debug_printf("DECODED: DRW Vx, Vy, nibble\n");
+			debug_printf("DECODED:  DRW Vx, Vy, nibble\n");
 			return &draw_op;
 		case 0xF:
 			return decodef(opcode);
 	}
 	switch (opcode) {
 		case 0x00E0:
-			debug_printf("DECODED: CLS\n");
+			debug_printf("DECODED:  CLS\n");
 			return &clear_op;
 		case 0x00EE:
-			debug_printf("DECODED: RET\n");
+			debug_printf("DECODED:  RET\n");
 			return &return_op;
 	}
-	debug_printf("DECODED: Illegal opcode\n");
+	debug_printf("DECODED:  Illegal opcode\n");
 	return NULL;
 }
 
@@ -468,7 +477,7 @@ Flag next_cycle() {
 	instruction static inst;
 	Flag flag = IDLE;
 	if (inst == NULL && clock == 2) {
-		debug_printf("Illegal opcode\n");
+		debug_printf("EXECUTED: Illegal opcode\n");
 		clock++;
 		clock %= 3;
 		return flag;
@@ -476,7 +485,7 @@ Flag next_cycle() {
 	switch (clock) {
 		case 0:
 			opcode = fetch();
-			debug_printf("FETCHED: %04x\n", opcode);
+			debug_printf("FETCHED:  %04x\n", opcode);
 			break;
 		case 1:
 			inst = decode(opcode);
