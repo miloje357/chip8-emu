@@ -1,20 +1,58 @@
 #include <locale.h>
 #include <ncurses.h>
+#include <stdbool.h>
+#include <unistd.h>
 
-#define PIXEL "██"
+#define PIXEL_ON "██"
+#define PIXEL_OFF "  "
+
+#define WIDHT 64
+#define HEIGHT 32
+#define DRAW_BORDER() draw_centered_border(HEIGHT + 1, WIDHT * 2 + 1)
+
+void draw_border(int y, int x, int h, int w)
+{
+       mvhline(y, x, 0, w);
+       mvhline(y + h, x, 0, w);
+       mvvline(y, x, 0, h);
+       mvvline(y, x + w, 0, h);
+       mvaddch(y, x, ACS_ULCORNER);
+       mvaddch(y + h, x, ACS_LLCORNER);
+       mvaddch(y, x + w, ACS_URCORNER);
+       mvaddch(y + h, x + w, ACS_LRCORNER);
+}
+
+void draw_centered_border(int h, int w) {
+       int scr_h, scr_w;
+       getmaxyx(stdscr, scr_h, scr_w);
+       draw_border((scr_h - h) / 2, (scr_w - w) / 2, h, w);
+}
+
+void draw_pixel(int y, int x, const char *pixel) {
+	int h, w;
+	getmaxyx(stdscr, h, w);
+	mvaddstr((h - HEIGHT) / 2 + y, w / 2 + x * 2 - WIDHT, pixel);
+}
 
 void init_graphics() {
 	setlocale(LC_CTYPE, "");
 	initscr();
 	noecho();
 	curs_set(0);
+	DRAW_BORDER();
+	refresh();
+}
 
-	// A checkered pattern for testing
-	for (int i = 0; i < 8; i++) {
+// TODO: Draw every draw instruction perhaps??
+void draw(unsigned char *video_mem) {
+	for (int i = 0; i < 0x100; i++) {
+		unsigned char curr_byte = video_mem[i];
 		for (int j = 0; j < 8; j++) {
-			if ((i + j) % 2 == 0) {
-				mvaddstr(i, j * 2, PIXEL);
-			}
+			int x = (i % 8) * 8 + j;
+			int y = i / 8;
+			const char *pixel = (curr_byte & 0x80) ? PIXEL_ON : PIXEL_OFF;
+			draw_pixel(y, x, pixel);
+			curr_byte <<= 1;
 		}
 	}
 	refresh();

@@ -30,14 +30,14 @@ int main(int argc, char *argv[]) {
 	srand(time(NULL));
 
 	init_chip8();
-	if (!should_debug()) {
-		init_graphics();
-	}
-
 	status = load_program(program_path);
 	if (status == 1) {
 		printf("Exiting...\n");
 		return 1;
+	}
+
+	if (!should_debug()) {
+		init_graphics();
 	}
 
 	while (1) {
@@ -49,8 +49,10 @@ int main(int argc, char *argv[]) {
 			fgetc(stdin);
 			continue;
 		}
-		next_cycle();
+		Flag flag = next_cycle();
+		if (flag == DRAW) draw(get_video_mem());
 		usleep(1.0 / (CLOCK_CYCLE * 1000000));
+		// fgetc(stdin);
 	}
 
 	// TODO: Run endwin somewhere
