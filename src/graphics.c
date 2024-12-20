@@ -1,6 +1,8 @@
 #include <locale.h>
 #include <ncurses.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #define PIXEL_ON "██"
@@ -43,7 +45,6 @@ void init_graphics() {
 	refresh();
 }
 
-// TODO: Draw every draw instruction perhaps??
 void draw(unsigned char *video_mem) {
 	for (int i = 0; i < 0x100; i++) {
 		unsigned char curr_byte = video_mem[i];
@@ -56,4 +57,31 @@ void draw(unsigned char *video_mem) {
 		}
 	}
 	refresh();
+}
+
+void st_flash(bool is_pixel_on) {
+	static bool was_pixel_on = false;
+	if (was_pixel_on == is_pixel_on) {
+		return;
+	}
+	was_pixel_on = is_pixel_on;
+
+	int h, w;
+	getmaxyx(stdscr, h, w);
+	char pixel = (is_pixel_on) ? '@' : ' ';
+	char *pixels = malloc(w * (h - HEIGHT - 2) / 2 + 1);
+	memset(pixels, pixel, w * (h - HEIGHT - 2) / 2);
+	pixels[w * (h - HEIGHT - 2) / 2 + 1] = '\0';
+	mvaddstr(0, 0, pixels);
+	mvaddstr((h + HEIGHT) / 2 + 1, 0, pixels);
+	free(pixels);
+	pixels = malloc(w / 2 - WIDHT);
+	memset(pixels, pixel, w / 2 - WIDHT - 1);
+	pixels[w / 2 - WIDHT - 1] = '\0';
+	for (int i = -1; i <= HEIGHT; i++) {
+		mvaddstr((h - HEIGHT) / 2 + i, 0, pixels);
+		mvaddstr((h - HEIGHT) / 2 + i, w / 2 + WIDHT + 1, pixels);
+	}
+	refresh();
+	free(pixels);
 }

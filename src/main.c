@@ -1,13 +1,19 @@
-#include <stdlib.h>
+#include <ncurses.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include "chip8.h"
 #include "debugger.h"
 #include "graphics.h"
 
-#define CLOCK_CYCLE 1.0 // in MHz
+unsigned long get_time() {
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec * 1000000 + tv.tv_usec;
+}
 
 int main(int argc, char *argv[]) {
 	int status;
@@ -40,6 +46,8 @@ int main(int argc, char *argv[]) {
 		init_graphics();
 	}
 
+	unsigned long start_time = get_time();
+	unsigned long end_time;
 	while (1) {
 		if (should_debug()) {
 			printf("\e[1;1H\e[2J");
@@ -47,11 +55,19 @@ int main(int argc, char *argv[]) {
 			printf("\n");
 			print_state();
 			fgetc(stdin);
+			update_timers();
 			continue;
 		}
 		Flag flag = next_cycle();
 		if (flag == DRAW) draw(get_video_mem());
-		usleep(1.0 / (CLOCK_CYCLE * 1000000));
+		usleep(1);
+		end_time = get_time();
+		if (end_time - start_time >= 1000000 / 60) {
+			Flag timer_flag = update_timers();
+			if (timer_flag == SOUND) st_flash(true);
+			else st_flash(false);
+			start_time = end_time;
+		}
 	}
 
 	// TODO: Run endwin somewhere

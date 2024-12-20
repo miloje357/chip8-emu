@@ -3,7 +3,8 @@
 
 typedef enum {
     IDLE,
-    DRAW
+    DRAW,
+    SOUND
 } Flag;
 
 int load_program(const char* program_path);
@@ -11,5 +12,6 @@ void print_state();
 void init_chip8();
 Flag next_cycle();
 unsigned char *get_video_mem();
+Flag update_timers();
 
 #endif

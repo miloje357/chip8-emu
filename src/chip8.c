@@ -24,6 +24,7 @@ unsigned char V[16];
 unsigned short pc;
 unsigned char sp;
 unsigned short I;
+unsigned char dt, st;
 unsigned char memory[4096] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -316,6 +317,24 @@ Flag draw_op(unsigned short opcode) {
 	return DRAW;
 }
 
+Flag delay_to_reg(unsigned short opcode) {
+	V[(int)THIRD_DEG(opcode)] = dt;
+	debug_printf("EXECUTED: LD V%x, DT\n", THIRD_DEG(opcode));
+	return IDLE;
+}
+
+Flag reg_to_delay(unsigned short opcode) {
+	dt = V[(int)THIRD_DEG(opcode)];
+	debug_printf("EXECUTED: LD DT, V%x\n", THIRD_DEG(opcode));
+	return IDLE;
+}
+
+Flag reg_to_sound(unsigned short opcode) {
+	st = V[(int)THIRD_DEG(opcode)];
+	debug_printf("EXECUTED: LD ST, V%x\n", THIRD_DEG(opcode));
+	return IDLE;
+}
+
 Flag add_index_reg(unsigned short opcode) {
 	I += V[(int)THIRD_DEG(opcode)];
 	debug_printf("EXECUTED: ADD I, V%x\n", THIRD_DEG(opcode));
@@ -390,6 +409,15 @@ instruction decode8(unsigned short opcode) {
 
 instruction decodef(unsigned short opcode) {
 	switch (opcode & 0x00ff) {
+		case 0x07:
+			debug_printf("DECODED:  LD Vx, DT\n");
+			return &delay_to_reg;
+		case 0x15:
+			debug_printf("DECODED:  LD DT, Vx\n");
+			return &reg_to_delay;
+		case 0x18:
+			debug_printf("DECODED:  LD ST, Vx\n");
+			return &reg_to_sound;
 		case 0x1E:
 			debug_printf("DECODED:  ADD I, Vx\n");
 			return &add_index_reg;
@@ -501,4 +529,11 @@ Flag next_cycle() {
 
 unsigned char *get_video_mem() {
 	return memory + START_VIDEO_MEM;
+}
+
+Flag update_timers() {
+	dt -= (dt != 0) ? 1 : 0;
+	st -= (st != 0) ? 1 : 0;
+	if (st != 0) return SOUND;
+	return IDLE;
 }
