@@ -39,7 +39,9 @@ void draw_pixel(int y, int x, const char *pixel) {
 void init_graphics() {
 	setlocale(LC_CTYPE, "");
 	initscr();
+	cbreak();
 	noecho();
+	nodelay(stdscr, true);
 	curs_set(0);
 	DRAW_BORDER();
 	refresh();

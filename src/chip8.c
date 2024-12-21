@@ -49,6 +49,35 @@ void init_chip8() {
 	sp = -2;
 }
 
+
+void skip_key(unsigned char reg, bool is_equal, unsigned char key) {
+	unsigned static char saved_reg;
+	static bool saved_is_equal;
+	if (reg != KEYBOARD_UNSET && key == KEYBOARD_UNSET) {
+		saved_reg = reg;
+		saved_is_equal = is_equal;
+		return;
+	}
+	if (reg == KEYBOARD_UNSET) {
+		unsigned char are_equal = (saved_is_equal) ? 2 : 0;
+		unsigned char are_not_equal = (saved_is_equal) ? 0 : 2;
+		pc += (V[saved_reg] == key) ? are_equal : are_not_equal;
+		return;
+	}
+}
+
+void load_key(unsigned char reg, unsigned char key) {
+	unsigned static char saved_reg;
+	if (reg != KEYBOARD_UNSET && key == KEYBOARD_UNSET) {
+		saved_reg = reg;
+		return;
+	}
+	if (reg == KEYBOARD_UNSET && key != KEYBOARD_UNSET) {
+		V[saved_reg] = key;
+		return;
+	}
+}
+
 int load_program(const char* program_path) {
 	FILE *program = fopen(program_path, "r");
 	if (program == NULL) {
@@ -133,7 +162,7 @@ unsigned short fetch() {
 }
 
 Flag clear_op(unsigned short opcode) {
-	for (int i = 0; i < 0xff; i++) {
+	for (int i = 0; i < 0x100; i++) {
 		memory[START_VIDEO_MEM + i] = 0;
 	}
 	debug_printf("EXECUTED: CLS\n");
@@ -223,10 +252,12 @@ Flag xor_reg(unsigned short opcode) {
 
 Flag add_reg(unsigned short opcode) {
 	int sum = V[(int)THIRD_DEG(opcode)] + V[(int)SECOND_DEG(opcode)];
+	int vf = 0;
 	if (sum > 0xff) {
-		V[0xF] = 1;
+		vf = 1;
 	}
 	V[(int)THIRD_DEG(opcode)] = sum;
+	V[0xf] = vf;
 	debug_printf("EXECUTED: ADD V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
 	return IDLE;
 }
@@ -234,10 +265,12 @@ Flag add_reg(unsigned short opcode) {
 
 Flag subtract_reg(unsigned short opcode) {
 	int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
+	int vf = 0;
 	if (diff >= 0) {
-		V[0xF] = 1;
+		vf = 1;
 	}
 	V[(int)THIRD_DEG(opcode)] = diff;
+	V[0xf] = vf;
 	debug_printf("EXECUTED: SUB V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
 	return IDLE;
 }
@@ -252,10 +285,12 @@ Flag shift_right_reg(unsigned short opcode) {
 
 Flag subtract_negated_reg(unsigned short opcode) {
 	int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
+	int vf = 0;
 	if (diff < 0) {
-		V[0xF] = 1;
+		vf = 1;
 	}
 	V[(int)THIRD_DEG(opcode)] = -diff;
+	V[0xf] = vf;
 	debug_printf("EXECUTED: SUBN V%x, V%x\n", THIRD_DEG(opcode), SECOND_DEG(opcode));
 	return IDLE;
 }
@@ -293,6 +328,7 @@ Flag random_reg(unsigned short opcode) {
 	return IDLE;
 }
 
+// TODO: Write it so it only draws the changed pixels
 Flag draw_op(unsigned short opcode) {
 	unsigned char vx = V[THIRD_DEG(opcode)];
 	unsigned char vy = V[SECOND_DEG(opcode)];
@@ -317,10 +353,29 @@ Flag draw_op(unsigned short opcode) {
 	return DRAW;
 }
 
+Flag skip_key_op(unsigned short opcode) {
+	skip_key(THIRD_DEG(opcode), true, KEYBOARD_UNSET);
+	debug_printf("EXECUTING: SKP V%x\n", THIRD_DEG(opcode));
+	return KEYBOARD_NONBLOCKING;
+}
+
+Flag skip_not_key_op(unsigned short opcode) {
+	skip_key(THIRD_DEG(opcode), false, KEYBOARD_UNSET);
+	debug_printf("EXECUTING: SKNP V%x\n", THIRD_DEG(opcode));
+	return KEYBOARD_NONBLOCKING;
+}
+
 Flag delay_to_reg(unsigned short opcode) {
 	V[(int)THIRD_DEG(opcode)] = dt;
 	debug_printf("EXECUTED: LD V%x, DT\n", THIRD_DEG(opcode));
 	return IDLE;
+}
+
+Flag key_to_reg(unsigned short opcode) {
+	load_key(THIRD_DEG(opcode), KEYBOARD_UNSET);
+	debug_printf("EXECUTING: LD V%x, K\n", THIRD_DEG(opcode));
+	debug_printf("Waiting for keyboard input!");
+	return KEYBOARD_BLOCKING;
 }
 
 Flag reg_to_delay(unsigned short opcode) {
@@ -407,11 +462,27 @@ instruction decode8(unsigned short opcode) {
 	return NULL;
 }
 
+instruction decodee(unsigned short opcode) {
+	switch (opcode & 0x00ff) {
+		case 0x9E:
+		debug_printf("DECODED:  SKP Vx\n");
+		return &skip_key_op;
+		case 0xA1:
+		debug_printf("DECODED:  SKNP Vx\n");
+		return &skip_not_key_op;
+	}
+	debug_printf("DECODED:  Illegal opcode\n");
+	return NULL;
+}
+
 instruction decodef(unsigned short opcode) {
 	switch (opcode & 0x00ff) {
 		case 0x07:
 			debug_printf("DECODED:  LD Vx, DT\n");
 			return &delay_to_reg;
+		case 0x0A:
+			debug_printf("DECODED:  LD Vx, K\n");
+			return &key_to_reg;
 		case 0x15:
 			debug_printf("DECODED:  LD DT, Vx\n");
 			return &reg_to_delay;
@@ -484,6 +555,8 @@ instruction decode(unsigned short opcode) {
 		case 0xD:
 			debug_printf("DECODED:  DRW Vx, Vy, nibble\n");
 			return &draw_op;
+		case 0xE:
+			return decodee(opcode);
 		case 0xF:
 			return decodef(opcode);
 	}
@@ -531,7 +604,7 @@ unsigned char *get_video_mem() {
 	return memory + START_VIDEO_MEM;
 }
 
-Flag update_timers() {
+Flag decrement_timers() {
 	dt -= (dt != 0) ? 1 : 0;
 	st -= (st != 0) ? 1 : 0;
 	if (st != 0) return SOUND;
