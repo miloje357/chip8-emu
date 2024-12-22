@@ -108,3 +108,4 @@ Makefile
 build/
 compile_commands.json
 program.py
+.clang-format

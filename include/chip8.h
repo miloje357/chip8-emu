@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 #define KEYBOARD_UNSET 0xff
+#define PROGRAM_START 0x200
+#define START_VIDEO_MEM 0xf00
 
 typedef enum {
     IDLE,

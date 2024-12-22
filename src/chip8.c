@@ -6,13 +6,8 @@
 
 #include "debugger.h"
 
-#define ANSI_COLOR_RED "\x1b[31m"
-#define ANSI_COLOR_RESET "\x1b[0m"
-
-#define PROGRAM_START 0x200
 #define STACK_START 0xee0
 #define STACK_END 0xf00
-#define START_VIDEO_MEM 0xf00
 #define FIRST_DEG(opcode) opcode & 0x000f
 #define SECOND_DEG(opcode) (opcode & 0x00f0) >> 4
 #define THIRD_DEG(opcode) (opcode & 0x0f00) >> 8
@@ -112,47 +107,15 @@ int load_program(const char *program_path) {
 }
 
 void print_state() {
-    printf("Registers:       ");
-    for (int i = 0; i < 16; i++) {
-        printf("%02x   ", V[i]);
-    }
+    print_registers(V);
     printf("\n");
-
-    printf("Stack:           ");
-    for (int i = STACK_START; i < STACK_END; i += 2) {
-        if (i - STACK_START == sp) {
-            printf(ANSI_COLOR_RED "%04x " ANSI_COLOR_RESET,
-                   *(unsigned short *)(memory + i));
-            continue;
-        }
-        printf("%04x ", *(unsigned short *)(memory + i));
-    }
+    print_stack(memory + STACK_START, STACK_END - STACK_START, sp);
     printf("\n");
-
     printf("Stack pointer:   %02x\n", sp);
     printf("Program counter: %04x\n", pc);
     printf("Index register:  %04x\n", I);
     printf("\n");
-
-    printf("Memory:\n");
-    for (int i = 0; i < 32; i++) {
-        printf("%04x  ", PROGRAM_START + i * 16);
-        for (int j = 0; j < 16; j++) {
-            unsigned short index = PROGRAM_START + i * 16 + j;
-            if (pc - 2 == index || pc - 1 == index) {
-                printf(ANSI_COLOR_RED "%02x " ANSI_COLOR_RESET, memory[index]);
-            } else
-                printf("%02x ", memory[index]);
-            if (j == 7) printf(" ");
-        }
-        printf("          %04x  ", START_VIDEO_MEM + i * 8);
-        for (int j = 0; j < 8; j++) {
-            unsigned short index = START_VIDEO_MEM + i * 8 + j;
-            printf("%02x ", memory[index]);
-            if (j == 7) printf(" ");
-        }
-        printf("\n");
-    }
+    print_memory(memory, pc);
 }
 
 unsigned short fetch() {

@@ -98,6 +98,18 @@ void update_timers(bool *keys) {
     }
 }
 
+void update_io(Flag flag, bool *keys) {
+    if (flag == DRAW) draw(get_video_mem());
+    if (flag == KEYBOARD_BLOCKING) {
+        unsigned char key = get_key(keys, KEYBOARD_BLOCKING);
+        load_key(KEYBOARD_UNSET, key);
+    }
+    if (flag == KEYBOARD_NONBLOCKING) {
+        unsigned char key = get_key(keys, KEYBOARD_NONBLOCKING);
+        skip_key(KEYBOARD_UNSET, KEYBOARD_UNSET, key);
+    }
+}
+
 int main(int argc, char *argv[]) {
     int status;
     if (argc != 2 && argc != 3) {
@@ -125,34 +137,22 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (!should_debug()) {
-        init_graphics();
+    while (should_debug()) {
+        printf("\e[1;1H\e[2J");
+        next_cycle();
+        printf("\n");
+        print_state();
+        decrement_timers();
+        fgetc(stdin);
     }
 
+    init_graphics();
     bool is_key_pressed[16];
     while (1) {
-        if (should_debug()) {
-            printf("\e[1;1H\e[2J");
-            next_cycle();
-            printf("\n");
-            print_state();
-            fgetc(stdin);
-            decrement_timers();
-            continue;
-        }
         Flag flag = next_cycle();
-        if (flag == DRAW) draw(get_video_mem());
-        if (flag == KEYBOARD_BLOCKING) {
-            load_key(KEYBOARD_UNSET,
-                     get_key(is_key_pressed, KEYBOARD_BLOCKING));
-        }
-        if (flag == KEYBOARD_NONBLOCKING) {
-            skip_key(KEYBOARD_UNSET, KEYBOARD_UNSET,
-                     get_key(is_key_pressed, KEYBOARD_NONBLOCKING));
-        }
+        update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);
         usleep(1);
     }
-    endwin();
     return 0;
 }
