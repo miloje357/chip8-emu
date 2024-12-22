@@ -16,7 +16,7 @@ int load_program(const char* program_path);
 void print_state();
 void init_chip8();
 Flag next_cycle();
-unsigned char *get_video_mem();
+unsigned char* get_video_mem();
 Flag decrement_timers();
 void skip_key(unsigned char reg, bool is_equal, unsigned char key);
 void load_key(unsigned char reg, unsigned char key);
