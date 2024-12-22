@@ -1,3 +1,5 @@
+#include "graphics.h"
+
 #include <locale.h>
 #include <ncurses.h>
 #include <stdbool.h>
@@ -46,17 +48,27 @@ void init_graphics() {
     refresh();
 }
 
-void draw(unsigned char *video_mem) {
-    for (int i = 0; i < 0x100; i++) {
-        unsigned char curr_byte = video_mem[i];
-        for (int j = 0; j < 8; j++) {
-            int x = (i % 8) * 8 + j;
-            int y = i / 8;
-            const char *pixel = (curr_byte & 0x80) ? PIXEL_ON : PIXEL_OFF;
-            draw_pixel(y, x, pixel);
-            curr_byte <<= 1;
+void draw(unsigned char *video_mem, unsigned short video_signal) {
+    unsigned char num_byte = (video_signal & 0xFF00) >> 8;
+    unsigned char n = (video_signal & 0x00F0) >> 4;
+    int x = num_byte % 8;
+    int y = num_byte / 8;
+    for (int i = 0; i < n; i++) {
+        unsigned short curr_short = video_mem[num_byte + i * 8] << 8;
+        curr_short += video_mem[num_byte + i * 8 + 1];
+        for (int j = 0; j < 16; j++) {
+            const char *pixel = (curr_short & 0x8000) ? PIXEL_ON : PIXEL_OFF;
+            draw_pixel(y + i, x * 8 + j, pixel);
+            curr_short <<= 1;
+            if (x == 7 && j >= 7) break;
         }
     }
+    refresh();
+}
+
+void clear_screen() {
+    clear();
+    DRAW_BORDER();
     refresh();
 }
 

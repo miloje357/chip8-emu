@@ -9,6 +9,7 @@
 typedef enum {
     IDLE,
     DRAW,
+    CLEAR,
     SOUND,
     KEYBOARD_BLOCKING,
     KEYBOARD_NONBLOCKING,
@@ -17,7 +18,7 @@ typedef enum {
 int load_program(const char* program_path);
 void print_state();
 void init_chip8();
-Flag next_cycle();
+unsigned short next_cycle();
 unsigned char* get_video_mem();
 Flag decrement_timers();
 void skip_key(unsigned char reg, bool is_equal, unsigned char key);

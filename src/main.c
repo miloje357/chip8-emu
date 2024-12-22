@@ -98,8 +98,10 @@ void update_timers(bool *keys) {
     }
 }
 
-void update_io(Flag flag, bool *keys) {
-    if (flag == DRAW) draw(get_video_mem());
+void update_io(unsigned short sig, bool *keys) {
+    Flag flag = (Flag)(sig & 0x000F);
+    if (flag == DRAW) draw(get_video_mem(), sig);
+    if (flag == CLEAR) clear_screen();
     if (flag == KEYBOARD_BLOCKING) {
         unsigned char key = get_key(keys, KEYBOARD_BLOCKING);
         load_key(KEYBOARD_UNSET, key);
@@ -149,7 +151,7 @@ int main(int argc, char *argv[]) {
     init_graphics();
     bool is_key_pressed[16];
     while (1) {
-        Flag flag = next_cycle();
+        unsigned short flag = next_cycle();
         update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);
         usleep(1);
