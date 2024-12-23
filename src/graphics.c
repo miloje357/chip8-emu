@@ -54,6 +54,7 @@ void draw(unsigned char *video_mem, unsigned short video_signal) {
     int x = num_byte % 8;
     int y = num_byte / 8;
     for (int i = 0; i < n; i++) {
+        if (y + i >= HEIGHT) break;
         unsigned short curr_short = video_mem[num_byte + i * 8] << 8;
         curr_short += video_mem[num_byte + i * 8 + 1];
         for (int j = 0; j < 16; j++) {

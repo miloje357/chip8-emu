@@ -205,6 +205,7 @@ unsigned short load_reg(unsigned short opcode) {
 
 unsigned short or_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] |= V[(int)SECOND_DEG(opcode)];
+    V[0xf] = 0;
     debug_printf("EXECUTED: OR V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -212,6 +213,7 @@ unsigned short or_reg(unsigned short opcode) {
 
 unsigned short and_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] &= V[(int)SECOND_DEG(opcode)];
+    V[0xf] = 0;
     debug_printf("EXECUTED: AND V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -219,6 +221,7 @@ unsigned short and_reg(unsigned short opcode) {
 
 unsigned short xor_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] ^= V[(int)SECOND_DEG(opcode)];
+    V[0xf] = 0;
     debug_printf("EXECUTED: XOR V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -251,8 +254,9 @@ unsigned short subtract_reg(unsigned short opcode) {
 }
 
 unsigned short shift_right_reg(unsigned short opcode) {
-    V[0xF] = V[(int)SECOND_DEG(opcode)] & 0x01;
+    unsigned char vf = V[(int)SECOND_DEG(opcode)] & 0x01;
     V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] >> 1;
+    V[0xf] = vf;
     debug_printf("EXECUTED: SHR V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -261,7 +265,7 @@ unsigned short shift_right_reg(unsigned short opcode) {
 unsigned short subtract_negated_reg(unsigned short opcode) {
     int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
     int vf = 0;
-    if (diff < 0) {
+    if (diff <= 0) {
         vf = 1;
     }
     V[(int)THIRD_DEG(opcode)] = -diff;
@@ -272,8 +276,9 @@ unsigned short subtract_negated_reg(unsigned short opcode) {
 }
 
 unsigned short shift_left_reg(unsigned short opcode) {
-    V[0xF] = (V[(int)SECOND_DEG(opcode)] & 0x80) >> 7;
+    unsigned char vf = (V[(int)SECOND_DEG(opcode)] & 0x80) >> 7;
     V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] << 1;
+    V[0xf] = vf;
     debug_printf("EXECUTED: SHL V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -319,11 +324,13 @@ unsigned short draw_op(unsigned short opcode) {
     for (int i = 0; i < n; i++) {
         unsigned short sprite_short = memory[I + i] << 8;
         sprite_short >>= (vx % 8);
-        y = ((vy + i) % 32) * 8;
+        y = (vy % 32 + i) * 8;
+        if (y < (vy % 32) * 8) break;
         if ((video_mem[x + y] & sprite_short >> 8) != 0) {
             V[0xF] = 1;
         }
         video_mem[x + y] ^= sprite_short >> 8;
+        if (x == 7) continue;
         if ((video_mem[(x + 1) % 8 + y] & sprite_short) != 0) {
             V[0xF] = 1;
         }
@@ -378,7 +385,7 @@ unsigned short add_index_reg(unsigned short opcode) {
 }
 
 unsigned short load_font(unsigned short opcode) {
-    I = V[THIRD_DEG(opcode)] * 5;
+    I = (V[THIRD_DEG(opcode)] & 0x000F) * 5;
     debug_printf("EXECUTED: LD F, Vx\n");
     return IDLE;
 }
@@ -386,7 +393,7 @@ unsigned short load_font(unsigned short opcode) {
 unsigned short to_bcd(unsigned short opcode) {
     int val = V[(int)THIRD_DEG(opcode)];
     for (int i = 2; i >= 0; i--) {
-        memory[I + i] = val % 10;
+        memory[(I + i) & 0xFFF] = val % 10;
         val /= 10;
     }
     debug_printf("EXECUTED: BCD V%x\n", THIRD_DEG(opcode));
@@ -397,6 +404,7 @@ unsigned short regs_to_memory(unsigned short opcode) {
     for (int i = 0; i <= THIRD_DEG(opcode); i++) {
         memory[I + i] = V[i];
     }
+    I += (THIRD_DEG(opcode)) + 1;
     debug_printf("EXECUTED: LD [%04x], V%x\n", I, THIRD_DEG(opcode));
     return IDLE;
 }
@@ -405,6 +413,7 @@ unsigned short memory_to_regs(unsigned short opcode) {
     for (int i = 0; i <= THIRD_DEG(opcode); i++) {
         V[i] = memory[I + i];
     }
+    I += (THIRD_DEG(opcode)) + 1;
     debug_printf("EXECUTED: LD V%x, [%04x]\n", THIRD_DEG(opcode), I);
     return IDLE;
 }
