@@ -72,10 +72,14 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
 }
 
 void update_keys(bool *keys) {
+    static unsigned long last_pressed;
+    unsigned long now = get_time();
     char key = getch();
+    if (key == ERR && now - last_pressed < 50000) return;
     for (int i = 0; i < 16; i++) {
         keys[i] = translate(key) == i;
     }
+    last_pressed = now;
 }
 
 void update_timers(bool *keys) {
@@ -83,7 +87,7 @@ void update_timers(bool *keys) {
     unsigned static long keyboard_timer;
     unsigned long now = get_time();
     // NOTE: This is NOT the optimal Hz for responsive input
-    if (now - keyboard_timer >= 1000000 / 40) {
+    if (now - keyboard_timer >= 1000000 / 60) {
         update_keys(keys);
         keyboard_timer = now;
     }
@@ -151,6 +155,7 @@ int main(int argc, char *argv[]) {
     init_graphics();
     bool is_key_pressed[16];
     while (1) {
+        handle_xset_message();
         unsigned short flag = next_cycle();
         update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);

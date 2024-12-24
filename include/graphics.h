@@ -6,5 +6,6 @@ void init_graphics();
 void draw(unsigned char *video_mem, unsigned short video_signal);
 void clear_screen();
 void st_flash(bool is_pixel_on);
+void handle_xset_message();
 
 #endif

@@ -5,10 +5,13 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #define PIXEL_ON "██"
 #define PIXEL_OFF "  "
+#define XSET_MESSAGE "Please run 'xset r rate 100' for better keyboard input"
+#define XSET_MESSAGE_TIME 10
 
 #define WIDHT 64
 #define HEIGHT 32
@@ -98,4 +101,44 @@ void st_flash(bool is_pixel_on) {
     }
     refresh();
     free(pixels);
+}
+
+unsigned long get_secs() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec;
+}
+
+void display_xset_message() {
+    int h, w;
+    getmaxyx(stdscr, h, w);
+    int y = (h - HEIGHT) / 4;
+    int x = (w - strlen(XSET_MESSAGE)) / 2;
+    draw_border(y - 1, x - 1, 2, strlen(XSET_MESSAGE) + 1);
+    mvaddstr(y, x, XSET_MESSAGE);
+    refresh();
+}
+
+void clear_xset_message() {
+    int h, w;
+    getmaxyx(stdscr, h, w);
+    int y = (h - HEIGHT) / 4 - 1;
+    int x = (w - strlen(XSET_MESSAGE)) / 2 - 1;
+    for (int i = 0; i < 3; i++) {
+        move(y + i, x);
+        clrtoeol();
+    }
+}
+
+void handle_xset_message() {
+    static unsigned long first_called;
+    static bool should_display = true;
+    if (!should_display) return;
+    if (first_called == 0) first_called = get_secs();
+    if (get_secs() - first_called > XSET_MESSAGE_TIME) {
+        should_display = false;
+        clear_xset_message();
+        return;
+    }
+    display_xset_message();
 }
