@@ -52,7 +52,7 @@ void print_stack(unsigned char *stack, unsigned char stack_size,
 
 void print_memory(unsigned char *memory, unsigned short pc) {
     printf("Memory:\n");
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 64; i++) {
         printf("%04x  ", PROGRAM_START + i * 16);
         for (int j = 0; j < 16; j++) {
             unsigned short index = PROGRAM_START + i * 16 + j;
@@ -62,9 +62,9 @@ void print_memory(unsigned char *memory, unsigned short pc) {
                 printf("%02x ", memory[index]);
             if (j == 7) printf(" ");
         }
-        printf("          %04x  ", START_VIDEO_MEM + i * 8);
-        for (int j = 0; j < 8; j++) {
-            unsigned short index = START_VIDEO_MEM + i * 8 + j;
+        printf("          %04x  ", START_VIDEO_MEM + i * 16);
+        for (int j = 0; j < 16; j++) {
+            unsigned short index = START_VIDEO_MEM + i * 16 + j;
             printf("%02x ", memory[index]);
             if (j == 7) printf(" ");
         }

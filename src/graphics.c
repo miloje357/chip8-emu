@@ -94,7 +94,7 @@ void init_graphics() {
 }
 
 // I want to kill myself
-void draw(unsigned char *video_mem, unsigned int video_signal) {
+void draw(unsigned char *video_mem, unsigned short video_signal) {
     unsigned short num_byte = (video_signal & 0xFFFF00) >> 8;
     num_byte--;
     unsigned char n = (video_signal & 0x00F0) >> 4;

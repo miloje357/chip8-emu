@@ -24,3 +24,4 @@ A CHIP-8 emulator developed for educational purposes
  - [ ] Add the extended instruction set
  - [ ] Add more resolutions
  - [ ] Make a better debugger
+ - [ ] Add adjustable clock speed

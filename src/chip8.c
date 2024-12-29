@@ -6,6 +6,9 @@
 
 #include "debugger.h"
 
+#define WIDTH 128
+#define HEIGHT 64
+
 #define STACK_START 0xee0
 #define STACK_END 0xf00
 #define FIRST_DEG(opcode) opcode & 0x000f
@@ -22,7 +25,7 @@ unsigned short pc;
 unsigned char sp;
 unsigned short I;
 unsigned char dt, st;
-unsigned char memory[4096] = {
+unsigned char memory[START_VIDEO_MEM + 0x400] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,  // 0
     0x20, 0x60, 0x20, 0x20, 0x70,  // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0,  // 2
@@ -127,7 +130,7 @@ unsigned short fetch() {
 }
 
 unsigned short clear_op(unsigned short opcode) {
-    for (int i = 0; i < 0x100; i++) {
+    for (int i = 0; i < 0x400; i++) {
         memory[START_VIDEO_MEM + i] = 0;
     }
     debug_printf("EXECUTED: CLS\n");
@@ -312,29 +315,35 @@ unsigned short random_reg(unsigned short opcode) {
     return IDLE;
 }
 
-// TODO: Write it so it only draws the changed pixels
 unsigned short draw_op(unsigned short opcode) {
     unsigned char vx = V[THIRD_DEG(opcode)];
     unsigned char vy = V[SECOND_DEG(opcode)];
     unsigned char n = FIRST_DEG(opcode);
+    // TODO: Add && hi_res when you add the HIGH and LOW opcodes
+    if (n == 0) n = 32;
     unsigned char *video_mem = memory + START_VIDEO_MEM;
     V[0xF] = 0;
-    unsigned char x = (vx % 64) / 8;
-    unsigned char y = (vy % 32) * 8;
-    for (int i = 0; i < n; i++) {
-        unsigned short sprite_short = memory[I + i] << 8;
-        sprite_short >>= (vx % 8);
-        y = (vy % 32 + i) * 8;
-        if (y < (vy % 32) * 8) break;
-        if ((video_mem[x + y] & sprite_short >> 8) != 0) {
-            V[0xF] = 1;
+    unsigned char x = (vx % WIDTH) / 8;
+    unsigned short y = (vy % HEIGHT) * 16;
+    for (int i = 0; i < n && y < HEIGHT * 16; i++) {
+        unsigned int sprite_int = memory[I + i] << 24;
+        if (n == 32) {
+            sprite_int |= memory[I + i + 1] << 16;
+            i++;
         }
-        video_mem[x + y] ^= sprite_short >> 8;
-        if (x == 7) continue;
-        if ((video_mem[(x + 1) % 8 + y] & sprite_short) != 0) {
-            V[0xF] = 1;
+        sprite_int >>= (vx % 8);
+        if (y < (vy % 64) * 16) break;
+        while (sprite_int != 0 && x < 16) {
+            unsigned char curr_byte = sprite_int >> 24;
+            if ((video_mem[x + y] & curr_byte) != 0) {
+                V[0xF] = 1;
+            }
+            sprite_int <<= 8;
+            video_mem[x + y] ^= curr_byte;
+            x++;
         }
-        video_mem[(x + 1) % 8 + y] ^= sprite_short;
+        x = (vx % WIDTH) / 8;
+        y += 16;
     }
     debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode), n);
