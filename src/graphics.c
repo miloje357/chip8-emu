@@ -93,26 +93,19 @@ void init_graphics() {
     refresh();
 }
 
-// I want to kill myself
-void draw(unsigned char *video_mem, unsigned short video_signal) {
+void draw(unsigned char *video_mem, unsigned int video_signal) {
     unsigned short num_byte = (video_signal & 0xFFFF00) >> 8;
-    num_byte--;
     unsigned char n = (video_signal & 0x00F0) >> 4;
     int x = num_byte % 16;
     int y = num_byte / 16;
     if (n == 0) n = 16;
-    for (int i = 0; i < n; i++) {
-        if (y + i >= HEIGHT) break;
-        unsigned int curr_int = video_mem[num_byte + i * 16] << 24;
-        curr_int |= video_mem[num_byte + i * 16 + 1] << 16;
-        curr_int |= video_mem[num_byte + i * 16 + 2] << 8;
-        curr_int |= video_mem[num_byte + i * 16 + 3];
-        for (int j = 0; j < 32; j++) {
-            draw_pixel(y + i, x * 8 + j, (curr_int & 0x80000000) >> 31);
+    for (int i = 0; i < n && y + i < HEIGHT; i++) {
+        unsigned int curr_int = video_mem[x + (y + i) * 16] << 24;
+        curr_int |= video_mem[x + (y + i) * 16 + 1] << 16;
+        if (n == 16) curr_int |= video_mem[x + (y + i) * 16 + 2] << 8;
+        for (int j = 0; j < 16 + ((n == 16) ? 8 : 0) && x * 8 + j < WIDHT; j++) {
+            draw_pixel(y + i, x * 8 + j, (curr_int >> 31));
             curr_int <<= 1;
-            if (x == 15 && j >= 7) break;
-            if (x == 14 && j >= 15) break;
-            if (x == 13 && j >= 23) break;
         }
     }
     refresh();

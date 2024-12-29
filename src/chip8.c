@@ -18,7 +18,7 @@
 #define IMMEDIATE(opcode) opcode & 0x00ff
 #define ADDR(opcode) opcode & 0x0fff
 
-typedef unsigned short (*instruction)(unsigned short);
+typedef unsigned int (*instruction)(unsigned short);
 
 unsigned char V[16];
 unsigned short pc;
@@ -129,7 +129,7 @@ unsigned short fetch() {
     return opcode;
 }
 
-unsigned short clear_op(unsigned short opcode) {
+unsigned int clear_op(unsigned short opcode) {
     for (int i = 0; i < 0x400; i++) {
         memory[START_VIDEO_MEM + i] = 0;
     }
@@ -137,20 +137,20 @@ unsigned short clear_op(unsigned short opcode) {
     return CLEAR;
 }
 
-unsigned short return_op(unsigned short opcode) {
+unsigned int return_op(unsigned short opcode) {
     pc = *(unsigned short *)(memory + STACK_START + sp);
     sp -= 2;
     debug_printf("EXECUTED: RET\n");
     return IDLE;
 }
 
-unsigned short jump(unsigned short opcode) {
+unsigned int jump(unsigned short opcode) {
     pc = ADDR(opcode);
     debug_printf("EXECUTED: JP %04x\n", pc);
     return IDLE;
 }
 
-unsigned short call(unsigned short opcode) {
+unsigned int call(unsigned short opcode) {
     sp += 2;
     *(unsigned short *)(memory + STACK_START + sp) = pc;
     pc = ADDR(opcode);
@@ -158,7 +158,7 @@ unsigned short call(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short skip_equal_immediate(unsigned short opcode) {
+unsigned int skip_equal_immediate(unsigned short opcode) {
     if (V[(int)THIRD_DEG(opcode)] == (IMMEDIATE(opcode))) {
         pc += 2;
     }
@@ -167,7 +167,7 @@ unsigned short skip_equal_immediate(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short skip_not_equal_immediate(unsigned short opcode) {
+unsigned int skip_not_equal_immediate(unsigned short opcode) {
     if (V[(int)THIRD_DEG(opcode)] != (IMMEDIATE(opcode))) {
         pc += 2;
     }
@@ -176,7 +176,7 @@ unsigned short skip_not_equal_immediate(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short skip_equal_reg(unsigned short opcode) {
+unsigned int skip_equal_reg(unsigned short opcode) {
     if (V[(int)THIRD_DEG(opcode)] == V[(int)SECOND_DEG(opcode)]) {
         pc += 2;
     }
@@ -185,28 +185,28 @@ unsigned short skip_equal_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short load_immediate(unsigned short opcode) {
+unsigned int load_immediate(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] = IMMEDIATE(opcode);
     debug_printf("EXECUTED: LD V%x, %x\n", THIRD_DEG(opcode),
                  IMMEDIATE(opcode));
     return IDLE;
 }
 
-unsigned short add_immediate(unsigned short opcode) {
+unsigned int add_immediate(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] += IMMEDIATE(opcode);
     debug_printf("EXECUTED: ADD V%x, %x\n", THIRD_DEG(opcode),
                  IMMEDIATE(opcode));
     return IDLE;
 }
 
-unsigned short load_reg(unsigned short opcode) {
+unsigned int load_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)];
     debug_printf("EXECUTED: LD V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
 }
 
-unsigned short or_reg(unsigned short opcode) {
+unsigned int or_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] |= V[(int)SECOND_DEG(opcode)];
     V[0xf] = 0;
     debug_printf("EXECUTED: OR V%x, V%x\n", THIRD_DEG(opcode),
@@ -214,7 +214,7 @@ unsigned short or_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short and_reg(unsigned short opcode) {
+unsigned int and_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] &= V[(int)SECOND_DEG(opcode)];
     V[0xf] = 0;
     debug_printf("EXECUTED: AND V%x, V%x\n", THIRD_DEG(opcode),
@@ -222,7 +222,7 @@ unsigned short and_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short xor_reg(unsigned short opcode) {
+unsigned int xor_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] ^= V[(int)SECOND_DEG(opcode)];
     V[0xf] = 0;
     debug_printf("EXECUTED: XOR V%x, V%x\n", THIRD_DEG(opcode),
@@ -230,7 +230,7 @@ unsigned short xor_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short add_reg(unsigned short opcode) {
+unsigned int add_reg(unsigned short opcode) {
     int sum = V[(int)THIRD_DEG(opcode)] + V[(int)SECOND_DEG(opcode)];
     int vf = 0;
     if (sum > 0xff) {
@@ -243,7 +243,7 @@ unsigned short add_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short subtract_reg(unsigned short opcode) {
+unsigned int subtract_reg(unsigned short opcode) {
     int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
     int vf = 0;
     if (diff >= 0) {
@@ -256,7 +256,7 @@ unsigned short subtract_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short shift_right_reg(unsigned short opcode) {
+unsigned int shift_right_reg(unsigned short opcode) {
     unsigned char vf = V[(int)SECOND_DEG(opcode)] & 0x01;
     V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] >> 1;
     V[0xf] = vf;
@@ -265,7 +265,7 @@ unsigned short shift_right_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short subtract_negated_reg(unsigned short opcode) {
+unsigned int subtract_negated_reg(unsigned short opcode) {
     int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
     int vf = 0;
     if (diff <= 0) {
@@ -278,7 +278,7 @@ unsigned short subtract_negated_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short shift_left_reg(unsigned short opcode) {
+unsigned int shift_left_reg(unsigned short opcode) {
     unsigned char vf = (V[(int)SECOND_DEG(opcode)] & 0x80) >> 7;
     V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] << 1;
     V[0xf] = vf;
@@ -287,7 +287,7 @@ unsigned short shift_left_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short skip_not_equal_reg(unsigned short opcode) {
+unsigned int skip_not_equal_reg(unsigned short opcode) {
     if (V[(int)THIRD_DEG(opcode)] != V[(int)SECOND_DEG(opcode)]) {
         pc += 2;
     }
@@ -296,26 +296,26 @@ unsigned short skip_not_equal_reg(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short load_index(unsigned short opcode) {
+unsigned int load_index(unsigned short opcode) {
     I = ADDR(opcode);
     debug_printf("EXECUTED: LD I, %04x\n", I);
     return IDLE;
 }
 
-unsigned short jump_reg(unsigned short opcode) {
+unsigned int jump_reg(unsigned short opcode) {
     pc = (ADDR(opcode)) + V[0];
     debug_printf("EXECUTED: JP V0, %04x\n", ADDR(opcode));
     return IDLE;
 }
 
-unsigned short random_reg(unsigned short opcode) {
+unsigned int random_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] = (rand() % 0x0100) & IMMEDIATE(opcode);
     debug_printf("EXECUTED: RND V%x, %02x\n", THIRD_DEG(opcode),
                  IMMEDIATE(opcode));
     return IDLE;
 }
 
-unsigned short draw_op(unsigned short opcode) {
+unsigned int draw_op(unsigned short opcode) {
     unsigned char vx = V[THIRD_DEG(opcode)];
     unsigned char vy = V[SECOND_DEG(opcode)];
     unsigned char n = FIRST_DEG(opcode);
@@ -332,7 +332,7 @@ unsigned short draw_op(unsigned short opcode) {
             i++;
         }
         sprite_int >>= (vx % 8);
-        if (y < (vy % 64) * 16) break;
+        if (y < (vy % HEIGHT) * 16) break;
         while (sprite_int != 0 && x < 16) {
             unsigned char curr_byte = sprite_int >> 24;
             if ((video_mem[x + y] & curr_byte) != 0) {
@@ -346,60 +346,60 @@ unsigned short draw_op(unsigned short opcode) {
         y += 16;
     }
     debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode), n);
-    return ((x + (vy % 32) * 8) << 8) | (n << 4) | DRAW;
+                 SECOND_DEG(opcode), FIRST_DEG(opcode));
+    return (((vx % WIDTH) / 8 + (vy % HEIGHT) * 16) << 8) | ((FIRST_DEG(opcode)) << 4) | DRAW;
 }
 
-unsigned short skip_key_op(unsigned short opcode) {
+unsigned int skip_key_op(unsigned short opcode) {
     skip_key(THIRD_DEG(opcode), true, KEYBOARD_UNSET);
     debug_printf("EXECUTING: SKP V%x\n", THIRD_DEG(opcode));
     return KEYBOARD_NONBLOCKING;
 }
 
-unsigned short skip_not_key_op(unsigned short opcode) {
+unsigned int skip_not_key_op(unsigned short opcode) {
     skip_key(THIRD_DEG(opcode), false, KEYBOARD_UNSET);
     debug_printf("EXECUTING: SKNP V%x\n", THIRD_DEG(opcode));
     return KEYBOARD_NONBLOCKING;
 }
 
-unsigned short delay_to_reg(unsigned short opcode) {
+unsigned int delay_to_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] = dt;
     debug_printf("EXECUTED: LD V%x, DT\n", THIRD_DEG(opcode));
     return IDLE;
 }
 
-unsigned short key_to_reg(unsigned short opcode) {
+unsigned int key_to_reg(unsigned short opcode) {
     load_key(THIRD_DEG(opcode), KEYBOARD_UNSET);
     debug_printf("EXECUTING: LD V%x, K\n", THIRD_DEG(opcode));
     debug_printf("Waiting for keyboard input!");
     return KEYBOARD_BLOCKING;
 }
 
-unsigned short reg_to_delay(unsigned short opcode) {
+unsigned int reg_to_delay(unsigned short opcode) {
     dt = V[(int)THIRD_DEG(opcode)];
     debug_printf("EXECUTED: LD DT, V%x\n", THIRD_DEG(opcode));
     return IDLE;
 }
 
-unsigned short reg_to_sound(unsigned short opcode) {
+unsigned int reg_to_sound(unsigned short opcode) {
     st = V[(int)THIRD_DEG(opcode)];
     debug_printf("EXECUTED: LD ST, V%x\n", THIRD_DEG(opcode));
     return IDLE;
 }
 
-unsigned short add_index_reg(unsigned short opcode) {
+unsigned int add_index_reg(unsigned short opcode) {
     I += V[(int)THIRD_DEG(opcode)];
     debug_printf("EXECUTED: ADD I, V%x\n", THIRD_DEG(opcode));
     return IDLE;
 }
 
-unsigned short load_font(unsigned short opcode) {
+unsigned int load_font(unsigned short opcode) {
     I = (V[THIRD_DEG(opcode)] & 0x000F) * 5;
     debug_printf("EXECUTED: LD F, Vx\n");
     return IDLE;
 }
 
-unsigned short to_bcd(unsigned short opcode) {
+unsigned int to_bcd(unsigned short opcode) {
     int val = V[(int)THIRD_DEG(opcode)];
     for (int i = 2; i >= 0; i--) {
         memory[(I + i) & 0xFFF] = val % 10;
@@ -409,7 +409,7 @@ unsigned short to_bcd(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short regs_to_memory(unsigned short opcode) {
+unsigned int regs_to_memory(unsigned short opcode) {
     for (int i = 0; i <= THIRD_DEG(opcode); i++) {
         memory[I + i] = V[i];
     }
@@ -418,7 +418,7 @@ unsigned short regs_to_memory(unsigned short opcode) {
     return IDLE;
 }
 
-unsigned short memory_to_regs(unsigned short opcode) {
+unsigned int memory_to_regs(unsigned short opcode) {
     for (int i = 0; i <= THIRD_DEG(opcode); i++) {
         V[i] = memory[I + i];
     }
@@ -571,11 +571,11 @@ instruction decode(unsigned short opcode) {
     return NULL;
 }
 
-unsigned short next_cycle() {
+unsigned int next_cycle() {
     unsigned static clock = 0;
     unsigned static short opcode;
     instruction static inst;
-    Flag flag = IDLE;
+    unsigned int flag = IDLE;
     if (inst == NULL && clock == 2) {
         debug_printf("EXECUTED: Illegal opcode\n");
         clock++;

@@ -150,17 +150,13 @@ int main(int argc, char *argv[]) {
     }
 
     init_graphics();
-    /* bool is_key_pressed[16];
+    bool is_key_pressed[16];
     while (1) {
         handle_xset_message();
         unsigned int flag = next_cycle();
         update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);
         usleep(1);
-    } */
-    while (1) {
-        pattern();
-        usleep(1000000);
     }
     endwin();
     return 0;
