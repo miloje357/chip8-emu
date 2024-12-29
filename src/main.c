@@ -55,8 +55,6 @@ unsigned char translate(char key) {
     return KEYBOARD_UNSET;
 }
 
-// NOTE: Must change the repeat delay for responsiveness
-//	 "xset r on rate <rate>"
 unsigned char get_key(bool *is_key_pressed, Flag flag) {
     if (flag == KEYBOARD_NONBLOCKING) {
         for (int i = 0; i < 16; i++) {
@@ -86,7 +84,6 @@ void update_timers(bool *keys) {
     unsigned static long cpu_timers;
     unsigned static long keyboard_timer;
     unsigned long now = get_time();
-    // NOTE: This is NOT the optimal Hz for responsive input
     if (now - keyboard_timer >= 1000000 / 60) {
         update_keys(keys);
         keyboard_timer = now;
@@ -102,7 +99,7 @@ void update_timers(bool *keys) {
     }
 }
 
-void update_io(unsigned short sig, bool *keys) {
+void update_io(unsigned int sig, bool *keys) {
     Flag flag = (Flag)(sig & 0x000F);
     if (flag == DRAW) draw(get_video_mem(), sig);
     if (flag == CLEAR) clear_screen();
@@ -153,13 +150,18 @@ int main(int argc, char *argv[]) {
     }
 
     init_graphics();
-    bool is_key_pressed[16];
+    /* bool is_key_pressed[16];
     while (1) {
         handle_xset_message();
-        unsigned short flag = next_cycle();
+        unsigned int flag = next_cycle();
         update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);
         usleep(1);
+    } */
+    while (1) {
+        pattern();
+        usleep(1000000);
     }
+    endwin();
     return 0;
 }
