@@ -25,6 +25,7 @@ unsigned short pc;
 unsigned char sp;
 unsigned short I;
 unsigned char dt, st;
+bool hi_res;
 unsigned char memory[START_VIDEO_MEM + 0x400] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,  // 0
     0x20, 0x60, 0x20, 0x20, 0x70,  // 1
@@ -141,6 +142,18 @@ unsigned int return_op(unsigned short opcode) {
     pc = *(unsigned short *)(memory + STACK_START + sp);
     sp -= 2;
     debug_printf("EXECUTED: RET\n");
+    return IDLE;
+}
+
+unsigned int low_op(unsigned short opcode) {
+    hi_res = false;
+    debug_printf("EXECUTED: LOW\n");
+    return IDLE;
+}
+
+unsigned int high_op(unsigned short opcode) {
+    hi_res = true;
+    debug_printf("EXECUTED: HIGH\n");
     return IDLE;
 }
 
@@ -319,8 +332,7 @@ unsigned int draw_op(unsigned short opcode) {
     unsigned char vx = V[THIRD_DEG(opcode)];
     unsigned char vy = V[SECOND_DEG(opcode)];
     unsigned char n = FIRST_DEG(opcode);
-    // TODO: Add && hi_res when you add the HIGH and LOW opcodes
-    if (n == 0) n = 32;
+    if (n == 0 && hi_res) n = 32;
     unsigned char *video_mem = memory + START_VIDEO_MEM;
     V[0xF] = 0;
     unsigned char x = (vx % WIDTH) / 8;
@@ -347,7 +359,8 @@ unsigned int draw_op(unsigned short opcode) {
     }
     debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode), FIRST_DEG(opcode));
-    return (((vx % WIDTH) / 8 + (vy % HEIGHT) * 16) << 8) | ((FIRST_DEG(opcode)) << 4) | DRAW;
+    return (((vx % WIDTH) / 8 + (vy % HEIGHT) * 16) << 8) |
+           ((FIRST_DEG(opcode)) << 4) | ((hi_res) ? DRAW_HI_RES : DRAW);
 }
 
 unsigned int skip_key_op(unsigned short opcode) {
@@ -566,6 +579,12 @@ instruction decode(unsigned short opcode) {
         case 0x00EE:
             debug_printf("DECODED:  RET\n");
             return &return_op;
+        case 0x00FE:
+            debug_printf("DECODED:  LOW\n");
+            return &low_op;
+        case 0x00FF:
+            debug_printf("DECODED:  HIGH\n");
+            return &high_op;
     }
     debug_printf("DECODED:  Illegal opcode\n");
     return NULL;

@@ -9,6 +9,7 @@
 typedef enum {
     IDLE,
     DRAW,
+    DRAW_HI_RES,
     CLEAR,
     SOUND,
     KEYBOARD_BLOCKING,

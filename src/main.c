@@ -101,7 +101,8 @@ void update_timers(bool *keys) {
 
 void update_io(unsigned int sig, bool *keys) {
     Flag flag = (Flag)(sig & 0x000F);
-    if (flag == DRAW) draw(get_video_mem(), sig);
+    if (flag == DRAW || flag == DRAW_HI_RES)
+        draw(get_video_mem(), sig, flag == DRAW_HI_RES);
     if (flag == CLEAR) clear_screen();
     if (flag == KEYBOARD_BLOCKING) {
         unsigned char key = get_key(keys, KEYBOARD_BLOCKING);

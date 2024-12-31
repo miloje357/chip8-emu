@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#define PIXEL_ON "██"
+#define PIXEL_OFF "  "
 #define ALL_ON "█"
 #define ALL_OFF " "
 #define TOP "▀"
@@ -47,6 +49,13 @@ void draw_centered_border(int h, int w) {
 void draw_pixel(int y, int x, bool is_on) {
     int h, w;
     getmaxyx(stdscr, h, w);
+    const char *pixel = (is_on) ? PIXEL_ON : PIXEL_OFF;
+    mvaddstr((h - HEIGHT / 2) / 2 + y, w / 2 + x * 2 - WIDHT / 2, pixel);
+}
+
+void draw_pixel_hi_res(int y, int x, bool is_on) {
+    int h, w;
+    getmaxyx(stdscr, h, w);
     int start_x = (w - WIDHT) / 2;
     int start_y = (h - HEIGHT / 2) / 2;
     unsigned char codepoint = mvinch(start_y + y / 2, start_x + x);
@@ -60,7 +69,7 @@ void draw_pixel(int y, int x, bool is_on) {
             if (y % 2 == 0 && is_on) return;
             if (y % 2 == 1 && !is_on) return;
             if (y % 2 == 0 && !is_on) {
-                SPACE(pixel); 
+                SPACE(pixel);
                 break;
             }
             pixel[2] = 0x88;
@@ -69,7 +78,7 @@ void draw_pixel(int y, int x, bool is_on) {
             if (y % 2 == 1 && is_on) return;
             if (y % 2 == 0 && !is_on) return;
             if (y % 2 == 1 && !is_on) {
-                SPACE(pixel); 
+                SPACE(pixel);
                 break;
             }
             pixel[2] = 0x88;
@@ -93,7 +102,7 @@ void init_graphics() {
     refresh();
 }
 
-void draw(unsigned char *video_mem, unsigned int video_signal) {
+void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
     unsigned short num_byte = (video_signal & 0xFFFF00) >> 8;
     unsigned char n = (video_signal & 0x00F0) >> 4;
     int x = num_byte % 16;
@@ -103,8 +112,12 @@ void draw(unsigned char *video_mem, unsigned int video_signal) {
         unsigned int curr_int = video_mem[x + (y + i) * 16] << 24;
         curr_int |= video_mem[x + (y + i) * 16 + 1] << 16;
         if (n == 16) curr_int |= video_mem[x + (y + i) * 16 + 2] << 8;
-        for (int j = 0; j < 16 + ((n == 16) ? 8 : 0) && x * 8 + j < WIDHT; j++) {
-            draw_pixel(y + i, x * 8 + j, (curr_int >> 31));
+        for (int j = 0; j < 16 + ((n == 16) ? 8 : 0) && x * 8 + j < WIDHT;
+             j++) {
+            if (hi_res)
+                draw_pixel_hi_res(y + i, x * 8 + j, (curr_int >> 31));
+            else
+                draw_pixel(y + i, x * 8 + j, (curr_int >> 31));
             curr_int <<= 1;
         }
     }
