@@ -145,6 +145,51 @@ unsigned int return_op(unsigned short opcode) {
     return IDLE;
 }
 
+unsigned int scroll_down(unsigned short opcode) {
+    unsigned char *video_mem = memory + START_VIDEO_MEM;
+    unsigned char n = FIRST_DEG(opcode);
+    // NOTE: This is a quirk
+    n /= (!hi_res) ? 2 : 1;
+    for (int i = HEIGHT - n; i >= 0; i--) {
+        for (int j = 0; j < WIDTH / 8; j++) {
+            video_mem[(i + n) * 16 + j] = video_mem[i * 16 + j];
+            video_mem[i * 16 + j] = 0;
+        }
+    }
+    debug_printf("EXECUTED: SCD nibble\n");
+    return (hi_res) << 4 | SCROLL;
+}
+
+unsigned int scroll_right(unsigned short opcode) {
+    unsigned char *video_mem = memory + START_VIDEO_MEM;
+    for (int i = WIDTH / 8 - 1; i > 0; i--) {
+        for (int j = 0; j < HEIGHT; j++) {
+            video_mem[j * 16 + i] >>= 4;
+            video_mem[j * 16 + i] |= video_mem[j * 16 + i - 1] << 4;
+        }
+    }
+    for (int j = 0; j < HEIGHT; j++) {
+        video_mem[j * 16] >>= 4;
+    }
+    debug_printf("EXECUTED: SCR\n");
+    return (hi_res) << 4 | SCROLL;
+}
+
+unsigned int scroll_left(unsigned short opcode) {
+    unsigned char *video_mem = memory + START_VIDEO_MEM;
+    for (int i = 0; i < WIDTH / 8 - 1; i++) {
+        for (int j = 0; j < HEIGHT; j++) {
+            video_mem[j * 16 + i] <<= 4;
+            video_mem[j * 16 + i] |= video_mem[j * 16 + i + 1] >> 4;
+        }
+    }
+    for (int j = 1; j <= HEIGHT; j++) {
+        video_mem[j * 16 - 1] <<= 4;
+    }
+    debug_printf("EXECUTED: SCL\n");
+    return (hi_res) << 4 | SCROLL;
+}
+
 unsigned int low_op(unsigned short opcode) {
     hi_res = false;
     debug_printf("EXECUTED: LOW\n");
@@ -521,8 +566,39 @@ instruction decodef(unsigned short opcode) {
     return NULL;
 }
 
+instruction decode0(unsigned short opcode) {
+    switch (opcode & 0x00ff) {
+        case 0xE0:
+            debug_printf("DECODED:  CLS\n");
+            return &clear_op;
+        case 0xEE:
+            debug_printf("DECODED:  RET\n");
+            return &return_op;
+        case 0xFB:
+            debug_printf("DECODED:  SCR\n");
+            return &scroll_right;
+        case 0xFC:
+            debug_printf("DECODED:  SCL\n");
+            return &scroll_left;
+        case 0xFE:
+            debug_printf("DECODED:  LOW\n");
+            return &low_op;
+        case 0xFF:
+            debug_printf("DECODED:  HIGH\n");
+            return &high_op;
+    }
+    if ((opcode & 0x00f0) == 0xC0) {
+        debug_printf("DECODED:  SCD nibble\n");
+        return &scroll_down;
+    }
+    debug_printf("DECODED:  Illegal opcode\n");
+    return NULL;
+}
+
 instruction decode(unsigned short opcode) {
     switch (FOURTH_DEG(opcode)) {
+        case 0:
+            return decode0(opcode);
         case 1:
             debug_printf("DECODED:  JP addr\n");
             return &jump;
@@ -571,20 +647,6 @@ instruction decode(unsigned short opcode) {
             return decodee(opcode);
         case 0xF:
             return decodef(opcode);
-    }
-    switch (opcode) {
-        case 0x00E0:
-            debug_printf("DECODED:  CLS\n");
-            return &clear_op;
-        case 0x00EE:
-            debug_printf("DECODED:  RET\n");
-            return &return_op;
-        case 0x00FE:
-            debug_printf("DECODED:  LOW\n");
-            return &low_op;
-        case 0x00FF:
-            debug_printf("DECODED:  HIGH\n");
-            return &high_op;
     }
     debug_printf("DECODED:  Illegal opcode\n");
     return NULL;

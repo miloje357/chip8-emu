@@ -116,8 +116,8 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
              j++) {
             if (hi_res)
                 draw_pixel_hi_res(y + i, x * 8 + j, (curr_int >> 31));
-            else
-                draw_pixel(y + i, x * 8 + j, (curr_int >> 31));
+            else if ((x * 8) % 64 + j < WIDHT / 2)
+                draw_pixel(y + i, (x * 8) % 64 + j, (curr_int >> 31));
             curr_int <<= 1;
         }
     }
@@ -197,13 +197,22 @@ void handle_xset_message() {
     display_xset_message();
 }
 
-void pattern() {
-    static bool should_switch;
-    for (int i = 0; i < 64; i++) {
-        for (int j = 0; j < 128; j++) {
-            draw_pixel(i, j, (i + j) % 2 == should_switch);
+void draw_all(unsigned char *video_mem, bool hi_res) {
+    clear_screen();
+    for (int num_byte = 0; num_byte < 0x400; num_byte++) {
+        unsigned char curr_byte = *(video_mem + num_byte);
+        int x = num_byte % 16;
+        int y = num_byte / 16;
+        if (!hi_res && x >= WIDHT / 8 / 2) continue;
+        if (!hi_res && y >= HEIGHT / 2) break;
+        for (int i = 0; i < 8; i++) {
+            if (hi_res) {
+                draw_pixel_hi_res(y, x * 8 + i, (curr_byte >> 7));
+                curr_byte <<= 1;
+                continue;
+            }
+            draw_pixel(y, (x * 8) % 64 + i, (curr_byte >> 7));
+            curr_byte <<= 1;
         }
     }
-    should_switch = !should_switch;
-    refresh();
 }

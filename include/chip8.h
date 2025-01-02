@@ -11,6 +11,7 @@ typedef enum {
     DRAW,
     DRAW_HI_RES,
     CLEAR,
+    SCROLL,
     SOUND,
     KEYBOARD_BLOCKING,
     KEYBOARD_NONBLOCKING,
