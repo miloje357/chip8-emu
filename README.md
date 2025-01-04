@@ -7,22 +7,11 @@ A CHIP-8 emulator developed for educational purposes
    - Keypad Test: ``Fx0A`` GETKEY (displays NOT HALTING)
    - Scrolling Test: ``0x00Cn`` (SCD) instruction doesn't behave like it should under __legacy__ mode
  - ``0x00FF`` (HIGH) and ``0x00FE`` (LOW) instructions don't behave like described [here](https://github.com/Chromatophore/HP48-Superchip/blob/master/investigations/quirk_display.md)
+ - Flag registars aren't persistent, like described [here](https://johnearnest.github.io/Octo/docs/SuperChip.html)
 
 
 ## TODOs
- - [ ] Add the extended instruction set
-    - Graphics
-    - [x] 00FE - LOW
-    - [x] 00FF - HIGH
-    - [x] Dxy0 - DRW Vx, Vy, 0
-    - [x] 00Cn - SCD nibble
-    - [x] 00FB - SCR
-    - [x] 00FC - SCL
-
-    - [ ] 00FD - EXIT
-    - [ ] Fx30 - LD HF, Vx
-    - [ ] Fx75 - LD R, Vx
-    - [ ] Fx85 - LD Vx, R
+ - [ ] Quirk menagment
 
 
  - [x] A "debug" version that only displays the current cpu context, without no graphics and no sound
@@ -37,6 +26,7 @@ A CHIP-8 emulator developed for educational purposes
  - [x] Fix the keyboard input
    - [x] XSet message
    - [x] Better keyboard timer
+ - [x] Add the extended instruction set
  - [ ] Make a assembler and a disassembler
  - [ ] Add the "safe mode" (no writing to stack...)
  - [ ] Add more resolutions

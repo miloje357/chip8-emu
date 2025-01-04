@@ -15,6 +15,7 @@ typedef enum {
     SOUND,
     KEYBOARD_BLOCKING,
     KEYBOARD_NONBLOCKING,
+    EXIT,
 } Flag;
 
 int load_program(const char* program_path);

@@ -153,9 +153,10 @@ int main(int argc, char *argv[]) {
 
     init_graphics();
     bool is_key_pressed[16];
-    while (1) {
+    unsigned int flag = IDLE;
+    while (flag != EXIT) {
         handle_xset_message();
-        unsigned int flag = next_cycle();
+        flag = next_cycle();
         update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);
         usleep(1);
