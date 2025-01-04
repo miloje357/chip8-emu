@@ -26,5 +26,6 @@ unsigned char* get_video_mem();
 Flag decrement_timers();
 void skip_key(unsigned char reg, bool is_equal, unsigned char key);
 void load_key(unsigned char reg, unsigned char key);
+void set_superchip8_quirks();
 
 #endif

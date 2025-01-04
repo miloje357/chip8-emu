@@ -117,19 +117,22 @@ void update_io(unsigned int sig, bool *keys) {
 
 int main(int argc, char *argv[]) {
     int status;
-    if (argc != 2 && argc != 3) {
-        printf("Usage: ./chip8_emu [-d] <program_path>\n");
-        return 1;
-    }
-    if (argc == 3 && strcmp(argv[1], "-d") != 0) {
-        printf("Usage: ./chip8_emu [-d] <program_path>\n");
-        return 1;
-    }
 
-    const char *program_path = argv[1];
-    if (argc == 3) {
-        set_debug();
-        program_path = argv[2];
+    char c;
+    while ((c = getopt(argc, argv, "ds")) != -1) {
+        switch (c) {
+            case 'd':
+                set_debug();
+                break;
+            case 's':
+                set_superchip8_quirks();
+                break;
+        }
+    }
+    const char *program_path = argv[optind];
+    if (program_path == NULL) {
+        printf("Usage: ./chip8_emu [-ds] <program_path>\n");
+        return 1;
     }
 
     // For RND instruction

@@ -27,6 +27,7 @@ unsigned char sp;
 unsigned short I;
 unsigned char dt, st;
 bool hi_res;
+bool has_superchip8_quirks;
 unsigned char flags[16];
 unsigned char memory[START_VIDEO_MEM + 0x400] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,                                // 0
@@ -289,7 +290,7 @@ unsigned int load_reg(unsigned short opcode) {
 
 unsigned int or_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] |= V[(int)SECOND_DEG(opcode)];
-    V[0xf] = 0;
+    if (!has_superchip8_quirks) V[0xf] = 0;
     debug_printf("EXECUTED: OR V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -297,7 +298,7 @@ unsigned int or_reg(unsigned short opcode) {
 
 unsigned int and_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] &= V[(int)SECOND_DEG(opcode)];
-    V[0xf] = 0;
+    if (!has_superchip8_quirks) V[0xf] = 0;
     debug_printf("EXECUTED: AND V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -305,7 +306,7 @@ unsigned int and_reg(unsigned short opcode) {
 
 unsigned int xor_reg(unsigned short opcode) {
     V[(int)THIRD_DEG(opcode)] ^= V[(int)SECOND_DEG(opcode)];
-    V[0xf] = 0;
+    if (!has_superchip8_quirks) V[0xf] = 0;
     debug_printf("EXECUTED: XOR V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
     return IDLE;
@@ -339,7 +340,10 @@ unsigned int subtract_reg(unsigned short opcode) {
 
 unsigned int shift_right_reg(unsigned short opcode) {
     unsigned char vf = V[(int)SECOND_DEG(opcode)] & 0x01;
-    V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] >> 1;
+    if (has_superchip8_quirks)
+        V[(int)SECOND_DEG(opcode)] >>= 1;
+    else
+        V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] >> 1;
     V[0xf] = vf;
     debug_printf("EXECUTED: SHR V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
@@ -361,7 +365,10 @@ unsigned int subtract_negated_reg(unsigned short opcode) {
 
 unsigned int shift_left_reg(unsigned short opcode) {
     unsigned char vf = (V[(int)SECOND_DEG(opcode)] & 0x80) >> 7;
-    V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] << 1;
+    if (has_superchip8_quirks)
+        V[(int)SECOND_DEG(opcode)] <<= 1;
+    else
+        V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] << 1;
     V[0xf] = vf;
     debug_printf("EXECUTED: SHL V%x, V%x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode));
@@ -384,7 +391,7 @@ unsigned int load_index(unsigned short opcode) {
 }
 
 unsigned int jump_reg(unsigned short opcode) {
-    pc = (ADDR(opcode)) + V[0];
+    pc = (ADDR(opcode)) + V[(has_superchip8_quirks) ? THIRD_DEG(opcode) : 0];
     debug_printf("EXECUTED: JP V0, %04x\n", ADDR(opcode));
     return IDLE;
 }
@@ -403,16 +410,22 @@ unsigned int draw_op(unsigned short opcode) {
     if (n == 0 && hi_res) n = 32;
     unsigned char *video_mem = memory + START_VIDEO_MEM;
     V[0xF] = 0;
-    unsigned char x = (vx % WIDTH) / 8;
-    unsigned short y = (vy % HEIGHT) * 16;
-    for (int i = 0; i < n && y < HEIGHT * 16; i++) {
+    int width = WIDTH;
+    int height = HEIGHT;
+    if (!hi_res) {
+        width /= 2;
+        height /= 2;
+    }
+    unsigned char x = (vx % width) / 8;
+    unsigned short y = (vy % height) * 16;
+    for (int i = 0; i < n && y < height * 16; i++) {
         unsigned int sprite_int = memory[I + i] << 24;
         if (n == 32) {
             sprite_int |= memory[I + i + 1] << 16;
             i++;
         }
         sprite_int >>= (vx % 8);
-        if (y < (vy % HEIGHT) * 16) break;
+        if (y < (vy % height) * 16) break;
         while (sprite_int != 0 && x < 16) {
             unsigned char curr_byte = sprite_int >> 24;
             if ((video_mem[x + y] & curr_byte) != 0) {
@@ -422,12 +435,12 @@ unsigned int draw_op(unsigned short opcode) {
             video_mem[x + y] ^= curr_byte;
             x++;
         }
-        x = (vx % WIDTH) / 8;
+        x = (vx % width) / 8;
         y += 16;
     }
     debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode), FIRST_DEG(opcode));
-    return (((vx % WIDTH) / 8 + (vy % HEIGHT) * 16) << 8) |
+    return (((vx % width) / 8 + (vy % height) * 16) << 8) |
            ((FIRST_DEG(opcode)) << 4) | ((hi_res) ? DRAW_HI_RES : DRAW);
 }
 
@@ -500,7 +513,7 @@ unsigned int regs_to_memory(unsigned short opcode) {
     for (int i = 0; i <= THIRD_DEG(opcode); i++) {
         memory[I + i] = V[i];
     }
-    I += (THIRD_DEG(opcode)) + 1;
+    if (!has_superchip8_quirks) I += (THIRD_DEG(opcode)) + 1;
     debug_printf("EXECUTED: LD [%04x], V%x\n", I, THIRD_DEG(opcode));
     return IDLE;
 }
@@ -509,7 +522,7 @@ unsigned int memory_to_regs(unsigned short opcode) {
     for (int i = 0; i <= THIRD_DEG(opcode); i++) {
         V[i] = memory[I + i];
     }
-    I += (THIRD_DEG(opcode)) + 1;
+    if (!has_superchip8_quirks) I += (THIRD_DEG(opcode)) + 1;
     debug_printf("EXECUTED: LD V%x, [%04x]\n", THIRD_DEG(opcode), I);
     return IDLE;
 }
@@ -745,3 +758,5 @@ Flag decrement_timers() {
     if (st != 0) return SOUND;
     return IDLE;
 }
+
+void set_superchip8_quirks() { has_superchip8_quirks = true; }
