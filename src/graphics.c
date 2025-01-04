@@ -7,7 +7,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <wchar.h>
 
 #define PIXEL_ON "██"
 #define PIXEL_OFF "  "
@@ -27,7 +26,7 @@
 
 #define WIDHT 128
 #define HEIGHT 64
-#define DRAW_BORDER() draw_centered_border(HEIGHT / 2 + 1, WIDHT + 1)
+#define DRAW_BORDER() draw_centered_border(HEIGHT / 2 + 2, WIDHT + 2)
 
 void draw_border(int y, int x, int h, int w) {
     mvhline(y, x, 0, w);
@@ -43,7 +42,7 @@ void draw_border(int y, int x, int h, int w) {
 void draw_centered_border(int h, int w) {
     int scr_h, scr_w;
     getmaxyx(stdscr, scr_h, scr_w);
-    draw_border((scr_h - h) / 2, (scr_w - w) / 2, h, w);
+    draw_border((scr_h - h) / 2, (scr_w - w) / 2, h - 1, w - 1);
 }
 
 void draw_pixel(int y, int x, bool is_on) {
