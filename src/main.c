@@ -5,10 +5,13 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <config.h>
 
 #include "chip8.h"
 #include "debugger.h"
 #include "graphics.h"
+
+#define DEFAULT_TICK_SPEED 900
 
 unsigned long get_time() {
     struct timeval tv;
@@ -115,11 +118,21 @@ void update_io(unsigned int sig, bool *keys) {
     }
 }
 
+void print_help() {
+    printf("Usage: ./chip8_emu [-dsh] [-t <tick_speed>] <program_path>\n\n");
+    printf("Options:\n");
+    printf(" -d                Enter debugging mode\n");
+    printf(" -s                Enable super-chip8 quirks\n");
+    printf(" -t <tick_speed>   Set tick speed (default 900)\n");
+    printf(" -h                Displays this message and version number\n");
+}
+
 int main(int argc, char *argv[]) {
     int status;
+    int tick_speed = DEFAULT_TICK_SPEED;
 
     char c;
-    while ((c = getopt(argc, argv, "ds")) != -1) {
+    while ((c = getopt(argc, argv, "dst:h")) != -1) {
         switch (c) {
             case 'd':
                 set_debug();
@@ -127,11 +140,21 @@ int main(int argc, char *argv[]) {
             case 's':
                 set_superchip8_quirks();
                 break;
+            case 't':
+                tick_speed = atoi(optarg);
+                break;
+            case 'h':
+                printf("%s\n", PACKAGE_STRING);
+                print_help();
+                return 0;
+            default:
+                print_help();
+                return -1;
         }
     }
     const char *program_path = argv[optind];
     if (program_path == NULL) {
-        printf("Usage: ./chip8_emu [-ds] <program_path>\n");
+        print_help();
         return 1;
     }
 
@@ -158,11 +181,13 @@ int main(int argc, char *argv[]) {
     bool is_key_pressed[16];
     unsigned int flag = IDLE;
     while (flag != EXIT) {
+        unsigned long start = get_time();
         handle_xset_message();
         flag = next_cycle();
         update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);
-        usleep(1);
+        unsigned long delta = get_time() - start;
+        if (delta < tick_speed / 3) usleep(tick_speed / 3 - delta);
     }
     endwin();
     return 0;

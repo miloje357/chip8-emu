@@ -107,15 +107,21 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
     int x = num_byte % 16;
     int y = num_byte / 16;
     if (n == 0) n = 16;
-    for (int i = 0; i < n && y + i < HEIGHT; i++) {
+    int width = WIDHT;
+    int height = HEIGHT;
+    if (!hi_res) {
+        width /= 2;
+        height /= 2;
+    }
+    for (int i = 0; i < n && y + i < height; i++) {
         unsigned int curr_int = video_mem[x + (y + i) * 16] << 24;
         curr_int |= video_mem[x + (y + i) * 16 + 1] << 16;
         if (n == 16) curr_int |= video_mem[x + (y + i) * 16 + 2] << 8;
-        for (int j = 0; j < 16 + ((n == 16) ? 8 : 0) && x * 8 + j < WIDHT;
+        for (int j = 0; j < 16 + ((n == 16) ? 8 : 0) && x * 8 + j < width;
              j++) {
             if (hi_res)
                 draw_pixel_hi_res(y + i, x * 8 + j, (curr_int >> 31));
-            else if ((x * 8) % 64 + j < WIDHT / 2)
+            else if ((x * 8) % 64 + j < width / 2)
                 draw_pixel(y + i, (x * 8) % 64 + j, (curr_int >> 31));
             curr_int <<= 1;
         }
