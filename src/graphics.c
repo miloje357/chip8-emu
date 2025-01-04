@@ -24,9 +24,9 @@
 #define XSET_MESSAGE "Please run 'xset r rate 100' for better keyboard input"
 #define XSET_MESSAGE_TIME 10
 
-#define WIDHT 128
-#define HEIGHT 64
-#define DRAW_BORDER() draw_centered_border(HEIGHT / 2 + 2, WIDHT + 2)
+#define REAL_WIDTH 128
+#define REAL_HEIGHT 32
+#define DRAW_BORDER() draw_centered_border(REAL_HEIGHT + 2, REAL_WIDTH + 2)
 
 void draw_border(int y, int x, int h, int w) {
     mvhline(y, x, 0, w);
@@ -49,14 +49,14 @@ void draw_pixel(int y, int x, bool is_on) {
     int h, w;
     getmaxyx(stdscr, h, w);
     const char *pixel = (is_on) ? PIXEL_ON : PIXEL_OFF;
-    mvaddstr((h - HEIGHT / 2) / 2 + y, w / 2 + x * 2 - WIDHT / 2, pixel);
+    mvaddstr((h - REAL_HEIGHT) / 2 + y, (w - REAL_WIDTH) / 2 + x * 2, pixel);
 }
 
 void draw_pixel_hi_res(int y, int x, bool is_on) {
     int h, w;
     getmaxyx(stdscr, h, w);
-    int start_x = (w - WIDHT) / 2;
-    int start_y = (h - HEIGHT / 2) / 2;
+    int start_x = (w - REAL_WIDTH) / 2;
+    int start_y = (h - REAL_HEIGHT) / 2;
     unsigned char codepoint = mvinch(start_y + y / 2, start_x + x);
     char pixel[] = {0xe2, 0x96, codepoint & 0xFF, 0};
     if (codepoint == ' ') {
@@ -107,12 +107,8 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
     int x = num_byte % 16;
     int y = num_byte / 16;
     if (n == 0) n = 16;
-    int width = WIDHT;
-    int height = HEIGHT;
-    if (!hi_res) {
-        width /= 2;
-        height /= 2;
-    }
+    int width = 128;
+    int height = (hi_res) ? 64 : 32;
     for (int i = 0; i < n && y + i < height; i++) {
         unsigned int curr_int = video_mem[x + (y + i) * 16] << 24;
         curr_int |= video_mem[x + (y + i) * 16 + 1] << 16;
@@ -145,18 +141,21 @@ void st_flash(bool is_pixel_on) {
     int h, w;
     getmaxyx(stdscr, h, w);
     char pixel = (is_pixel_on) ? '@' : ' ';
-    char *pixels = malloc(w * (h - HEIGHT - 2) / 2 + 1);
-    memset(pixels, pixel, w * (h - HEIGHT - 2) / 2);
-    pixels[w * (h - HEIGHT - 2) / 2 + 1] = '\0';
+    int flash_h = (h - (REAL_HEIGHT + 2)) / 2;
+    char *pixels = malloc(w * flash_h + 1);
+    memset(pixels, pixel, w * flash_h);
+    pixels[w * flash_h + 1] = '\0';
     mvaddstr(0, 0, pixels);
-    mvaddstr((h + HEIGHT) / 2 + 1, 0, pixels);
+    mvaddstr((h + REAL_HEIGHT) / 2 + 1, 0, pixels);
     free(pixels);
-    pixels = malloc(w / 2 - WIDHT);
-    memset(pixels, pixel, w / 2 - WIDHT - 1);
-    pixels[w / 2 - WIDHT - 1] = '\0';
-    for (int i = -1; i <= HEIGHT; i++) {
-        mvaddstr((h - HEIGHT) / 2 + i, 0, pixels);
-        mvaddstr((h - HEIGHT) / 2 + i, w / 2 + WIDHT + 1, pixels);
+
+    int flash_w = (w - REAL_WIDTH) / 2;
+    pixels = malloc(flash_w);
+    memset(pixels, pixel, flash_w - 1);
+    pixels[flash_w - 1] = '\0';
+    for (int i = 0; i <= REAL_HEIGHT + 1; i++) {
+        mvaddstr(flash_h + i, 0, pixels);
+        mvaddstr(flash_h + i, (w + REAL_WIDTH) / 2 + 1, pixels);
     }
     refresh();
     free(pixels);
@@ -171,7 +170,7 @@ unsigned long get_secs() {
 void display_xset_message() {
     int h, w;
     getmaxyx(stdscr, h, w);
-    int y = (h - HEIGHT / 2) / 4;
+    int y = (h - REAL_HEIGHT) / 4;
     int x = (w - strlen(XSET_MESSAGE)) / 2;
     draw_border(y - 1, x - 1, 2, strlen(XSET_MESSAGE) + 1);
     mvaddstr(y, x, XSET_MESSAGE);
@@ -181,7 +180,7 @@ void display_xset_message() {
 void clear_xset_message() {
     int h, w;
     getmaxyx(stdscr, h, w);
-    int y = (h - HEIGHT) / 4 - 1;
+    int y = (h - REAL_HEIGHT) / 4 - 1;
     int x = (w - strlen(XSET_MESSAGE)) / 2 - 1;
     for (int i = 0; i < 3; i++) {
         move(y + i, x);
@@ -208,8 +207,8 @@ void draw_all(unsigned char *video_mem, bool hi_res) {
         unsigned char curr_byte = *(video_mem + num_byte);
         int x = num_byte % 16;
         int y = num_byte / 16;
-        if (!hi_res && x >= WIDHT / 8 / 2) continue;
-        if (!hi_res && y >= HEIGHT / 2) break;
+        if (!hi_res && x >= 64 / 8) continue;
+        if (!hi_res && y >= 32 / 2) break;
         for (int i = 0; i < 8; i++) {
             if (hi_res) {
                 draw_pixel_hi_res(y, x * 8 + i, (curr_byte >> 7));

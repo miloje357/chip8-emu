@@ -11,8 +11,6 @@ A CHIP-8 emulator developed for educational purposes
 
 
 ## TODOs
- - [ ] Add adjustable clock speed
-
  - [x] A "debug" version that only displays the current cpu context, without no graphics and no sound
     - With this version, I hope to run a simple "Sum of first n natural numbers" program
     - This version will only implement single-stepping
@@ -27,9 +25,10 @@ A CHIP-8 emulator developed for educational purposes
  - [x] Add the extended instruction set
  - [x] Quirk menagment
  - [x] Better border (sometimes display clips the border)
+ - [x] Add adjustable clock speed
  - [ ] Make a assembler and a disassembler
  - [ ] Add the "safe mode" (no writing to stack...)
  - [ ] Make a better debugger
 
 ## Bugs
- - [ ] [Black Rainbow](https://johnearnest.github.io/chip8Archive/play.html?p=blackrainbow) - Segfault when you die.
+ - [ ] [Horsey Jump](https://johnearnest.github.io/chip8Archive/play.html?p=horseyJump) - Horse doesn't display
