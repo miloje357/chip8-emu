@@ -1,3 +1,4 @@
+#include <config.h>
 #include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,7 +6,6 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-#include <config.h>
 
 #include "chip8.h"
 #include "debugger.h"
@@ -20,42 +20,15 @@ unsigned long get_time() {
 }
 
 unsigned char translate(char key) {
+    static const unsigned char lookup_table[256] = {
+        ['1'] = 0x1, ['2'] = 0x2, ['3'] = 0x3, ['4'] = 0xc,
+        ['q'] = 0x4, ['w'] = 0x5, ['e'] = 0x6, ['r'] = 0xd,
+        ['a'] = 0x7, ['s'] = 0x8, ['d'] = 0x9, ['f'] = 0xe,
+        ['z'] = 0xa, ['x'] = 0x0, ['c'] = 0xb, ['v'] = 0xf};
+    if (key == 'x') return 0;
     if (key == ERR) return KEYBOARD_UNSET;
-    switch (key) {
-        case '1':
-            return 0x1;
-        case '2':
-            return 0x2;
-        case '3':
-            return 0x3;
-        case '4':
-            return 0xc;
-        case 'q':
-            return 0x4;
-        case 'w':
-            return 0x5;
-        case 'e':
-            return 0x6;
-        case 'r':
-            return 0xd;
-        case 'a':
-            return 0x7;
-        case 's':
-            return 0x8;
-        case 'd':
-            return 0x9;
-        case 'f':
-            return 0xe;
-        case 'z':
-            return 0xa;
-        case 'x':
-            return 0x0;
-        case 'c':
-            return 0xb;
-        case 'v':
-            return 0xf;
-    }
-    return KEYBOARD_UNSET;
+    return lookup_table[(unsigned char)key] ? lookup_table[(unsigned char)key]
+                                            : KEYBOARD_UNSET;
 }
 
 unsigned char get_key(bool *is_key_pressed, Flag flag) {
@@ -65,6 +38,7 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
         }
         return KEYBOARD_UNSET;
     }
+    // KEYBOARD_BLOCKING
     unsigned char key = KEYBOARD_UNSET;
     while (key == KEYBOARD_UNSET) {
         key = translate(getch());
@@ -94,27 +68,41 @@ void update_timers(bool *keys) {
 
     if (now - cpu_timers >= 1000000 / 60) {
         Flag timer_flag = decrement_timers();
-        if (timer_flag == SOUND)
-            st_flash(true);
-        else
-            st_flash(false);
+        st_flash(timer_flag == SOUND);
         cpu_timers = now;
     }
 }
 
 void update_io(unsigned int sig, bool *keys) {
     Flag flag = (Flag)(sig & 0x000F);
-    if (flag == DRAW || flag == DRAW_HI_RES)
-        draw(get_video_mem(), sig, flag == DRAW_HI_RES);
-    if (flag == CLEAR) clear_screen();
-    if (flag == SCROLL) draw_all(get_video_mem(), (sig & 0xF0) >> 4);
-    if (flag == KEYBOARD_BLOCKING) {
-        unsigned char key = get_key(keys, KEYBOARD_BLOCKING);
-        load_key(KEYBOARD_UNSET, key);
-    }
-    if (flag == KEYBOARD_NONBLOCKING) {
-        unsigned char key = get_key(keys, KEYBOARD_NONBLOCKING);
-        skip_key(KEYBOARD_UNSET, KEYBOARD_UNSET, key);
+    unsigned char key;
+
+    switch (flag) {
+        case DRAW:
+        case DRAW_HI_RES:
+            draw(get_video_mem(), sig, flag == DRAW_HI_RES);
+            break;
+
+        case CLEAR:
+            clear_screen();
+            break;
+
+        case SCROLL:
+            draw_all(get_video_mem(), (sig & 0xF0) >> 4);
+            break;
+
+        case KEYBOARD_BLOCKING:
+            key = get_key(keys, KEYBOARD_BLOCKING);
+            load_key(KEYBOARD_UNSET, key);
+            break;
+
+        case KEYBOARD_NONBLOCKING:
+            key = get_key(keys, KEYBOARD_NONBLOCKING);
+            skip_key(KEYBOARD_UNSET, KEYBOARD_UNSET, key);
+            break;
+
+        default:
+            break;
     }
 }
 
@@ -142,6 +130,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 't':
                 tick_speed = atoi(optarg);
+                if (tick_speed == 0) tick_speed = DEFAULT_TICK_SPEED;
                 break;
             case 'h':
                 printf("%s\n", PACKAGE_STRING);
@@ -149,7 +138,7 @@ int main(int argc, char *argv[]) {
                 return 0;
             default:
                 print_help();
-                return -1;
+                return 1;
         }
     }
     const char *program_path = argv[optind];
@@ -169,6 +158,7 @@ int main(int argc, char *argv[]) {
     }
 
     while (should_debug()) {
+        // clear screen
         printf("\e[1;1H\e[2J");
         next_cycle();
         printf("\n");
@@ -187,6 +177,7 @@ int main(int argc, char *argv[]) {
         update_io(flag, is_key_pressed);
         update_timers(is_key_pressed);
         unsigned long delta = get_time() - start;
+        // divide by 3 because fetch-decode and then execute
         if (delta < tick_speed / 3) usleep(tick_speed / 3 - delta);
     }
     endwin();

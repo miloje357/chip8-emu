@@ -2,6 +2,7 @@
 A CHIP-8 emulator developed for educational purposes
 
 ## Notes
+ - **KEYBOARD INPUT IS TERRIBLE**
  - [Timendus/chip8-test-suite](https://github.com/Timendus/chip8-test-suite): Passes all tests except
    - Quirks Test: Display wait
    - Keypad Test: ``Fx0A`` GETKEY (displays NOT HALTING)
@@ -30,5 +31,8 @@ A CHIP-8 emulator developed for educational purposes
  - [ ] Add the "safe mode" (no writing to stack...)
  - [ ] Make a better debugger
 
+## Refactoring
+ - Write every hex number lowercase with leading zeros.
+ - Use asserts
+
 ## Bugs
- - [ ] [Horsey Jump](https://johnearnest.github.io/chip8Archive/play.html?p=horseyJump) - Horse doesn't display
