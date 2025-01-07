@@ -34,5 +34,6 @@ A CHIP-8 emulator developed for educational purposes
 ## Refactoring
  - Write every hex number lowercase with leading zeros.
  - Use asserts
+ - Too many magic values
 
 ## Bugs

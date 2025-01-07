@@ -74,7 +74,7 @@ void update_timers(bool *keys) {
 }
 
 void update_io(unsigned int sig, bool *keys) {
-    Flag flag = (Flag)(sig & 0x000F);
+    Flag flag = (Flag)GET_FLAG(sig);
     unsigned char key;
 
     switch (flag) {
@@ -88,7 +88,7 @@ void update_io(unsigned int sig, bool *keys) {
             break;
 
         case SCROLL:
-            draw_all(get_video_mem(), (sig & 0xF0) >> 4);
+            draw_all(get_video_mem(), GET_HI_RES(sig));
             break;
 
         case KEYBOARD_BLOCKING:

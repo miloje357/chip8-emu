@@ -6,9 +6,6 @@
 
 #include "debugger.h"
 
-#define WIDTH 128
-#define HEIGHT 64
-
 #define STACK_START 0xee0
 #define STACK_END 0xf00
 #define BIG_FONT_OFFSET 5 * 16
@@ -29,7 +26,7 @@ unsigned char dt, st;
 bool hi_res;
 bool has_superchip8_quirks;
 unsigned char flags[16];
-unsigned char memory[START_VIDEO_MEM + 0x400] = {
+unsigned char memory[START_VIDEO_MEM + SIZE_VIDEO_MEM] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,                                // 0
     0x20, 0x60, 0x20, 0x20, 0x70,                                // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0,                                // 2
@@ -150,7 +147,7 @@ unsigned short fetch() {
 }
 
 unsigned int clear_op(unsigned short opcode) {
-    for (int i = 0; i < 0x400; i++) {
+    for (int i = 0; i < SIZE_VIDEO_MEM; i++) {
         memory[START_VIDEO_MEM + i] = 0;
     }
     debug_printf("EXECUTED: CLS\n");
@@ -167,9 +164,8 @@ unsigned int return_op(unsigned short opcode) {
 unsigned int scroll_down(unsigned short opcode) {
     unsigned char *video_mem = memory + START_VIDEO_MEM;
     unsigned char n = FIRST_DEG(opcode);
-    // NOTE: This is a quirk
     n /= (!hi_res) ? 2 : 1;
-    for (int i = HEIGHT - n; i >= 0; i--) {
+    for (int i = HEIGTH - n; i >= 0; i--) {
         for (int j = 0; j < WIDTH / 8; j++) {
             video_mem[(i + n) * 16 + j] = video_mem[i * 16 + j];
             video_mem[i * 16 + j] = 0;
@@ -182,12 +178,12 @@ unsigned int scroll_down(unsigned short opcode) {
 unsigned int scroll_right(unsigned short opcode) {
     unsigned char *video_mem = memory + START_VIDEO_MEM;
     for (int i = WIDTH / 8 - 1; i > 0; i--) {
-        for (int j = 0; j < HEIGHT; j++) {
+        for (int j = 0; j < HEIGTH; j++) {
             video_mem[j * 16 + i] >>= 4;
             video_mem[j * 16 + i] |= video_mem[j * 16 + i - 1] << 4;
         }
     }
-    for (int j = 0; j < HEIGHT; j++) {
+    for (int j = 0; j < HEIGTH; j++) {
         video_mem[j * 16] >>= 4;
     }
     debug_printf("EXECUTED: SCR\n");
@@ -197,12 +193,12 @@ unsigned int scroll_right(unsigned short opcode) {
 unsigned int scroll_left(unsigned short opcode) {
     unsigned char *video_mem = memory + START_VIDEO_MEM;
     for (int i = 0; i < WIDTH / 8 - 1; i++) {
-        for (int j = 0; j < HEIGHT; j++) {
+        for (int j = 0; j < HEIGTH; j++) {
             video_mem[j * 16 + i] <<= 4;
             video_mem[j * 16 + i] |= video_mem[j * 16 + i + 1] >> 4;
         }
     }
-    for (int j = 1; j <= HEIGHT; j++) {
+    for (int j = 1; j <= HEIGTH; j++) {
         video_mem[j * 16 - 1] <<= 4;
     }
     debug_printf("EXECUTED: SCL\n");
@@ -407,16 +403,14 @@ unsigned int draw_op(unsigned short opcode) {
     unsigned char vx = V[THIRD_DEG(opcode)];
     unsigned char vy = V[SECOND_DEG(opcode)];
     unsigned char n = FIRST_DEG(opcode);
-    if (n == 0 && hi_res) n = 32;
+    if (n == 0) n = 32;
     unsigned char *video_mem = memory + START_VIDEO_MEM;
     V[0xF] = 0;
-    int width = WIDTH;
-    int height = HEIGHT;
+    int width = (hi_res) ? WIDTH : WIDTH / 2;
+    int height = HEIGTH;
     if (!hi_res) {
-        width /= 2;
         height /= 2;
     }
-    unsigned char x = (vx % width) / 8;
     unsigned short y = (vy % height) * 16;
     for (int i = 0; i < n && y < height * 16; i++) {
         unsigned int sprite_int = memory[I + i] << 24;
@@ -426,22 +420,20 @@ unsigned int draw_op(unsigned short opcode) {
         }
         sprite_int >>= (vx % 8);
         if (y < (vy % height) * 16) break;
-        while (sprite_int != 0 && x < 16) {
+        for (int x = (vx % width) / 8; x < 16; x++) {
             unsigned char curr_byte = sprite_int >> 24;
             if ((video_mem[x + y] & curr_byte) != 0) {
                 V[0xF] = 1;
             }
             sprite_int <<= 8;
             video_mem[x + y] ^= curr_byte;
-            x++;
         }
-        x = (vx % width) / 8;
         y += 16;
     }
     debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD_DEG(opcode),
                  SECOND_DEG(opcode), FIRST_DEG(opcode));
-    return (((vx % width) / 8 + (vy % height) * 16) << 8) |
-           ((FIRST_DEG(opcode)) << 4) | ((hi_res) ? DRAW_HI_RES : DRAW);
+    return SET_XY((vx % width) / 8 + (vy % height) * 16) |
+           SET_N(FIRST_DEG(opcode)) | SET_FLAG((hi_res) ? DRAW_HI_RES : DRAW);
 }
 
 unsigned int skip_key_op(unsigned short opcode) {
