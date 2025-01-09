@@ -9,15 +9,13 @@
 #define HEIGTH 64
 #define SIZE_VIDEO_MEM (WIDTH * HEIGTH) / 8
 
-#define GET_FLAG(sig) sig & 0x0000000f
 #define GET_N(sig) (sig & 0x000000f0) >> 4
 #define GET_XY(sig) (sig & 0x00ffff00) >> 8
-#define GET_HI_RES(sig) (sig & 0x0f000000) >> 28
+#define GET_HI_RES(sig) (sig & 0x0f000000) >> 24
 
-#define SET_FLAG(flag) (flag)
 #define SET_N(n) (n) << 4
 #define SET_XY(xy) (xy) << 8
-#define SET_HI_RES(hi_res) (hi_res) << 28
+#define SET_HI_RES(hi_res) (hi_res) << 24
 
 typedef enum {
     IDLE,

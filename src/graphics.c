@@ -146,7 +146,7 @@ void draw_all(unsigned char *video_mem, bool hi_res) {
         int x = num_byte % NUM_BYTES_IN_ROW;
         int y = num_byte / NUM_BYTES_IN_ROW;
         if (!hi_res && x >= NUM_BYTES_IN_ROW / 2) continue;
-        if (!hi_res && y >= 32 / 2) break;
+        if (!hi_res && y >= HEIGTH / 2) break;
         for (int i = 0; i < 8; i++) {
             if (hi_res) {
                 draw_pixel_hi_res(y, x * 8 + i, (curr_byte >> 7));

@@ -74,7 +74,7 @@ void update_timers(bool *keys) {
 }
 
 void update_io(unsigned int sig, bool *keys) {
-    Flag flag = (Flag)GET_FLAG(sig);
+    Flag flag = (Flag)(sig & 0xf);
     unsigned char key;
 
     switch (flag) {

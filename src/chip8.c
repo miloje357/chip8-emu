@@ -3,18 +3,24 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "debugger.h"
 
+#define PIXELS_TO_SCROLL_RL 4
+#define SIZE_MEMORY START_VIDEO_MEM + SIZE_VIDEO_MEM
 #define STACK_START 0xee0
 #define STACK_END 0xf00
-#define BIG_FONT_OFFSET 5 * 16
-#define FIRST_DEG(opcode) opcode & 0x000f
-#define SECOND_DEG(opcode) (opcode & 0x00f0) >> 4
-#define THIRD_DEG(opcode) (opcode & 0x0f00) >> 8
-#define FOURTH_DEG(opcode) (opcode & 0xf000) >> 12
-#define IMMEDIATE(opcode) opcode & 0x00ff
-#define ADDR(opcode) opcode & 0x0fff
+#define FONT_HEIGTH 5
+#define BIG_FONT_HEIGTH 10
+#define BIG_FONT_OFFSET FONT_HEIGTH * 16
+#define FIRST(opcode) (opcode & 0x000f)
+#define SECOND(opcode) ((opcode & 0x00f0) >> 4)
+#define THIRD(opcode) ((opcode & 0x0f00) >> 8)
+#define FOURTH(opcode) ((opcode & 0xf000) >> 12)
+#define IMMEDIATE(opcode) (opcode & 0x00ff)
+#define ADDR(opcode) (opcode & 0x0fff)
+#define NUM_BYTES_IN_ROW (SIZE_VIDEO_MEM / HEIGTH)
 
 typedef unsigned int (*instruction)(unsigned short);
 
@@ -26,39 +32,39 @@ unsigned char dt, st;
 bool hi_res;
 bool has_superchip8_quirks;
 unsigned char flags[16];
-unsigned char memory[START_VIDEO_MEM + SIZE_VIDEO_MEM] = {
-    0xF0, 0x90, 0x90, 0x90, 0xF0,                                // 0
+unsigned char memory[SIZE_MEMORY] = {
+    0xf0, 0x90, 0x90, 0x90, 0xf0,                                // 0
     0x20, 0x60, 0x20, 0x20, 0x70,                                // 1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0,                                // 2
-    0xF0, 0x10, 0xF0, 0x10, 0xF0,                                // 3
-    0x90, 0x90, 0xF0, 0x10, 0x10,                                // 4
-    0xF0, 0x80, 0xF0, 0x10, 0xF0,                                // 5
-    0xF0, 0x80, 0xF0, 0x90, 0xF0,                                // 6
-    0xF0, 0x10, 0x20, 0x40, 0x40,                                // 7
-    0xF0, 0x90, 0xF0, 0x90, 0xF0,                                // 8
-    0xF0, 0x90, 0xF0, 0x10, 0xF0,                                // 9
-    0xF0, 0x90, 0xF0, 0x90, 0x90,                                // A
-    0xE0, 0x90, 0xE0, 0x90, 0xE0,                                // B
-    0xF0, 0x80, 0x80, 0x80, 0xF0,                                // C
-    0xE0, 0x90, 0x90, 0x90, 0xE0,                                // D
-    0xF0, 0x80, 0xF0, 0x80, 0xF0,                                // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80,                                // F
-    0x7C, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x7C, 0x00,  // big 0
-    0x08, 0x18, 0x38, 0x08, 0x08, 0x08, 0x08, 0x08, 0x3C, 0x00,  // big 1
-    0x7C, 0x82, 0x02, 0x02, 0x04, 0x18, 0x20, 0x40, 0xFE, 0x00,  // big 2
-    0x7C, 0x82, 0x02, 0x02, 0x3C, 0x02, 0x02, 0x82, 0x7C, 0x00,  // big 3
-    0x84, 0x84, 0x84, 0x84, 0xFE, 0x04, 0x04, 0x04, 0x04, 0x00,  // big 4
-    0xFE, 0x80, 0x80, 0x80, 0xFC, 0x02, 0x02, 0x82, 0x7C, 0x00,  // big 5
-    0x7C, 0x82, 0x80, 0x80, 0xFC, 0x82, 0x82, 0x82, 0x7C, 0x00,  // big 6
-    0xFE, 0x02, 0x04, 0x08, 0x10, 0x20, 0x20, 0x20, 0x20, 0x00,  // big 7
-    0x7C, 0x82, 0x82, 0x82, 0x7C, 0x82, 0x82, 0x82, 0x7C, 0x00,  // big 8
-    0x7C, 0x82, 0x82, 0x82, 0x7E, 0x02, 0x02, 0x82, 0x7C, 0x00,  // big 9
-    0x10, 0x28, 0x44, 0x82, 0x82, 0xFE, 0x82, 0x82, 0x82, 0x00,  // big A
-    0xFC, 0x82, 0x82, 0x82, 0xFC, 0x82, 0x82, 0x82, 0xFC, 0x00,  // big B
-    0x7C, 0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x82, 0x7C, 0x00,  // big C
-    0xFC, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0xFC, 0x00,  // big D
-    0xFE, 0x80, 0x80, 0x80, 0xF8, 0x80, 0x80, 0x80, 0xFE, 0x00,  // big E
-    0xFE, 0x80, 0x80, 0x80, 0xF8, 0x80, 0x80, 0x80, 0x80, 0x00,  // big F
+    0xf0, 0x10, 0xf0, 0x80, 0xf0,                                // 2
+    0xf0, 0x10, 0xf0, 0x10, 0xf0,                                // 3
+    0x90, 0x90, 0xf0, 0x10, 0x10,                                // 4
+    0xf0, 0x80, 0xf0, 0x10, 0xf0,                                // 5
+    0xf0, 0x80, 0xf0, 0x90, 0xf0,                                // 6
+    0xf0, 0x10, 0x20, 0x40, 0x40,                                // 7
+    0xf0, 0x90, 0xf0, 0x90, 0xf0,                                // 8
+    0xf0, 0x90, 0xf0, 0x10, 0xf0,                                // 9
+    0xf0, 0x90, 0xf0, 0x90, 0x90,                                // A
+    0xe0, 0x90, 0xe0, 0x90, 0xe0,                                // B
+    0xf0, 0x80, 0x80, 0x80, 0xf0,                                // C
+    0xe0, 0x90, 0x90, 0x90, 0xe0,                                // D
+    0xf0, 0x80, 0xf0, 0x80, 0xf0,                                // E
+    0xf0, 0x80, 0xf0, 0x80, 0x80,                                // F
+    0x7c, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x7c, 0x00,  // big 0
+    0x08, 0x18, 0x38, 0x08, 0x08, 0x08, 0x08, 0x08, 0x3c, 0x00,  // big 1
+    0x7c, 0x82, 0x02, 0x02, 0x04, 0x18, 0x20, 0x40, 0xfe, 0x00,  // big 2
+    0x7c, 0x82, 0x02, 0x02, 0x3c, 0x02, 0x02, 0x82, 0x7c, 0x00,  // big 3
+    0x84, 0x84, 0x84, 0x84, 0xfe, 0x04, 0x04, 0x04, 0x04, 0x00,  // big 4
+    0xfe, 0x80, 0x80, 0x80, 0xfc, 0x02, 0x02, 0x82, 0x7c, 0x00,  // big 5
+    0x7c, 0x82, 0x80, 0x80, 0xfc, 0x82, 0x82, 0x82, 0x7c, 0x00,  // big 6
+    0xfe, 0x02, 0x04, 0x08, 0x10, 0x20, 0x20, 0x20, 0x20, 0x00,  // big 7
+    0x7c, 0x82, 0x82, 0x82, 0x7c, 0x82, 0x82, 0x82, 0x7c, 0x00,  // big 8
+    0x7c, 0x82, 0x82, 0x82, 0x7e, 0x02, 0x02, 0x82, 0x7c, 0x00,  // big 9
+    0x10, 0x28, 0x44, 0x82, 0x82, 0xfe, 0x82, 0x82, 0x82, 0x00,  // big A
+    0xfc, 0x82, 0x82, 0x82, 0xfc, 0x82, 0x82, 0x82, 0xfc, 0x00,  // big B
+    0x7c, 0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x82, 0x7c, 0x00,  // big C
+    0xfc, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0xfc, 0x00,  // big D
+    0xfe, 0x80, 0x80, 0x80, 0xf8, 0x80, 0x80, 0x80, 0xfe, 0x00,  // big E
+    0xfe, 0x80, 0x80, 0x80, 0xf8, 0x80, 0x80, 0x80, 0x80, 0x00,  // big F
 };
 
 void init_chip8() {
@@ -139,22 +145,21 @@ void print_state() {
 }
 
 unsigned short fetch() {
-    unsigned short opcode;
-    opcode = memory[pc] << 8;
-    opcode += memory[pc + 1];
+    // TODO: Write error handling for pc >= SIZE_MEMORY
+    unsigned short opcode = memory[pc] << 8;
+    opcode |= memory[pc + 1];
     pc += 2;
     return opcode;
 }
 
 unsigned int clear_op(unsigned short opcode) {
-    for (int i = 0; i < SIZE_VIDEO_MEM; i++) {
-        memory[START_VIDEO_MEM + i] = 0;
-    }
+    memset(get_video_mem(), 0, SIZE_VIDEO_MEM);
     debug_printf("EXECUTED: CLS\n");
     return CLEAR;
 }
 
 unsigned int return_op(unsigned short opcode) {
+    // TODO: Write error handling for stack underflow
     pc = *(unsigned short *)(memory + STACK_START + sp);
     sp -= 2;
     debug_printf("EXECUTED: RET\n");
@@ -162,47 +167,46 @@ unsigned int return_op(unsigned short opcode) {
 }
 
 unsigned int scroll_down(unsigned short opcode) {
-    unsigned char *video_mem = memory + START_VIDEO_MEM;
-    unsigned char n = FIRST_DEG(opcode);
-    n /= (!hi_res) ? 2 : 1;
-    for (int i = HEIGTH - n; i >= 0; i--) {
-        for (int j = 0; j < WIDTH / 8; j++) {
-            video_mem[(i + n) * 16 + j] = video_mem[i * 16 + j];
-            video_mem[i * 16 + j] = 0;
-        }
-    }
+    unsigned char *video_mem = get_video_mem();
+    unsigned char n = FIRST(opcode);
+    // n /= (!hi_res) ? 2 : 1;
+    memcpy(video_mem + n * NUM_BYTES_IN_ROW, video_mem,
+           (HEIGTH - n) * NUM_BYTES_IN_ROW);
+    memset(video_mem, 0, n * NUM_BYTES_IN_ROW);
     debug_printf("EXECUTED: SCD nibble\n");
-    return (hi_res) << 4 | SCROLL;
+    return SET_HI_RES(hi_res) | SCROLL;
 }
 
 unsigned int scroll_right(unsigned short opcode) {
-    unsigned char *video_mem = memory + START_VIDEO_MEM;
-    for (int i = WIDTH / 8 - 1; i > 0; i--) {
+    unsigned char *video_mem = get_video_mem();
+    for (int i = NUM_BYTES_IN_ROW - 1; i > 0; i--) {
         for (int j = 0; j < HEIGTH; j++) {
-            video_mem[j * 16 + i] >>= 4;
-            video_mem[j * 16 + i] |= video_mem[j * 16 + i - 1] << 4;
+            video_mem[j * NUM_BYTES_IN_ROW + i] >>= PIXELS_TO_SCROLL_RL;
+            video_mem[j * NUM_BYTES_IN_ROW + i] |=
+                video_mem[j * NUM_BYTES_IN_ROW + i - 1] << PIXELS_TO_SCROLL_RL;
         }
     }
     for (int j = 0; j < HEIGTH; j++) {
-        video_mem[j * 16] >>= 4;
+        video_mem[j * NUM_BYTES_IN_ROW] >>= PIXELS_TO_SCROLL_RL;
     }
     debug_printf("EXECUTED: SCR\n");
-    return (hi_res) << 4 | SCROLL;
+    return SET_HI_RES(hi_res) | SCROLL;
 }
 
 unsigned int scroll_left(unsigned short opcode) {
-    unsigned char *video_mem = memory + START_VIDEO_MEM;
-    for (int i = 0; i < WIDTH / 8 - 1; i++) {
+    unsigned char *video_mem = get_video_mem();
+    for (int i = 0; i < NUM_BYTES_IN_ROW - 1; i++) {
         for (int j = 0; j < HEIGTH; j++) {
-            video_mem[j * 16 + i] <<= 4;
-            video_mem[j * 16 + i] |= video_mem[j * 16 + i + 1] >> 4;
+            video_mem[j * NUM_BYTES_IN_ROW + i] <<= PIXELS_TO_SCROLL_RL;
+            video_mem[j * NUM_BYTES_IN_ROW + i] |=
+                video_mem[j * NUM_BYTES_IN_ROW + i + 1] >> PIXELS_TO_SCROLL_RL;
         }
     }
     for (int j = 1; j <= HEIGTH; j++) {
-        video_mem[j * 16 - 1] <<= 4;
+        video_mem[j * NUM_BYTES_IN_ROW - 1] <<= PIXELS_TO_SCROLL_RL;
     }
     debug_printf("EXECUTED: SCL\n");
-    return (hi_res) << 4 | SCROLL;
+    return SET_HI_RES(hi_res) | SCROLL;
 }
 
 unsigned int exit_op(unsigned short opcode) {
@@ -230,6 +234,7 @@ unsigned int jump(unsigned short opcode) {
 
 unsigned int call(unsigned short opcode) {
     sp += 2;
+    // TODO: Write error handling for stack overflow
     *(unsigned short *)(memory + STACK_START + sp) = pc;
     pc = ADDR(opcode);
     debug_printf("EXECUTED: CALL %04x\n", pc);
@@ -237,146 +242,119 @@ unsigned int call(unsigned short opcode) {
 }
 
 unsigned int skip_equal_immediate(unsigned short opcode) {
-    if (V[(int)THIRD_DEG(opcode)] == (IMMEDIATE(opcode))) {
+    if (V[THIRD(opcode)] == IMMEDIATE(opcode)) {
         pc += 2;
     }
-    debug_printf("EXECUTED: SE V%x, %x\n", THIRD_DEG(opcode),
-                 IMMEDIATE(opcode));
+    debug_printf("EXECUTED: SE V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
     return IDLE;
 }
 
 unsigned int skip_not_equal_immediate(unsigned short opcode) {
-    if (V[(int)THIRD_DEG(opcode)] != (IMMEDIATE(opcode))) {
+    if (V[THIRD(opcode)] != IMMEDIATE(opcode)) {
         pc += 2;
     }
-    debug_printf("EXECUTED: SNE V%x, %x\n", THIRD_DEG(opcode),
-                 IMMEDIATE(opcode));
+    debug_printf("EXECUTED: SNE V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
     return IDLE;
 }
 
 unsigned int skip_equal_reg(unsigned short opcode) {
-    if (V[(int)THIRD_DEG(opcode)] == V[(int)SECOND_DEG(opcode)]) {
+    if (V[THIRD(opcode)] == V[SECOND(opcode)]) {
         pc += 2;
     }
-    debug_printf("EXECUTED: SE V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    debug_printf("EXECUTED: SE V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int load_immediate(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] = IMMEDIATE(opcode);
-    debug_printf("EXECUTED: LD V%x, %x\n", THIRD_DEG(opcode),
-                 IMMEDIATE(opcode));
+    V[THIRD(opcode)] = IMMEDIATE(opcode);
+    debug_printf("EXECUTED: LD V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
     return IDLE;
 }
 
 unsigned int add_immediate(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] += IMMEDIATE(opcode);
-    debug_printf("EXECUTED: ADD V%x, %x\n", THIRD_DEG(opcode),
-                 IMMEDIATE(opcode));
+    V[THIRD(opcode)] += IMMEDIATE(opcode);
+    debug_printf("EXECUTED: ADD V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
     return IDLE;
 }
 
 unsigned int load_reg(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)];
-    debug_printf("EXECUTED: LD V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    V[THIRD(opcode)] = V[SECOND(opcode)];
+    debug_printf("EXECUTED: LD V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int or_reg(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] |= V[(int)SECOND_DEG(opcode)];
+    V[THIRD(opcode)] |= V[SECOND(opcode)];
     if (!has_superchip8_quirks) V[0xf] = 0;
-    debug_printf("EXECUTED: OR V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    debug_printf("EXECUTED: OR V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int and_reg(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] &= V[(int)SECOND_DEG(opcode)];
+    V[THIRD(opcode)] &= V[SECOND(opcode)];
     if (!has_superchip8_quirks) V[0xf] = 0;
-    debug_printf("EXECUTED: AND V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    debug_printf("EXECUTED: AND V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int xor_reg(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] ^= V[(int)SECOND_DEG(opcode)];
+    V[THIRD(opcode)] ^= V[SECOND(opcode)];
     if (!has_superchip8_quirks) V[0xf] = 0;
-    debug_printf("EXECUTED: XOR V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    debug_printf("EXECUTED: XOR V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int add_reg(unsigned short opcode) {
-    int sum = V[(int)THIRD_DEG(opcode)] + V[(int)SECOND_DEG(opcode)];
-    int vf = 0;
-    if (sum > 0xff) {
-        vf = 1;
-    }
-    V[(int)THIRD_DEG(opcode)] = sum;
-    V[0xf] = vf;
-    debug_printf("EXECUTED: ADD V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    int sum = V[THIRD(opcode)] + V[SECOND(opcode)];
+    V[THIRD(opcode)] = sum;
+    V[0xf] = sum > 0xff;
+    debug_printf("EXECUTED: ADD V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int subtract_reg(unsigned short opcode) {
-    int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
-    int vf = 0;
-    if (diff >= 0) {
-        vf = 1;
-    }
-    V[(int)THIRD_DEG(opcode)] = diff;
-    V[0xf] = vf;
-    debug_printf("EXECUTED: SUB V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    int diff = V[THIRD(opcode)] - V[SECOND(opcode)];
+    V[THIRD(opcode)] = diff;
+    V[0xf] = diff >= 0;
+    debug_printf("EXECUTED: SUB V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int shift_right_reg(unsigned short opcode) {
-    unsigned char vf = V[(int)SECOND_DEG(opcode)] & 0x01;
+    unsigned char vf = V[SECOND(opcode)] & 0x01;
     if (has_superchip8_quirks)
-        V[(int)SECOND_DEG(opcode)] >>= 1;
+        V[SECOND(opcode)] >>= 1;
     else
-        V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] >> 1;
+        V[THIRD(opcode)] = V[SECOND(opcode)] >> 1;
     V[0xf] = vf;
-    debug_printf("EXECUTED: SHR V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    debug_printf("EXECUTED: SHR V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int subtract_negated_reg(unsigned short opcode) {
-    int diff = V[(int)THIRD_DEG(opcode)] - V[(int)SECOND_DEG(opcode)];
-    int vf = 0;
-    if (diff <= 0) {
-        vf = 1;
-    }
-    V[(int)THIRD_DEG(opcode)] = -diff;
-    V[0xf] = vf;
-    debug_printf("EXECUTED: SUBN V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    int diff = V[THIRD(opcode)] - V[SECOND(opcode)];
+    V[THIRD(opcode)] = -diff;
+    V[0xf] = diff <= 0;
+    debug_printf("EXECUTED: SUBN V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int shift_left_reg(unsigned short opcode) {
-    unsigned char vf = (V[(int)SECOND_DEG(opcode)] & 0x80) >> 7;
+    unsigned char vf = (V[SECOND(opcode)] & 0x80) >> 7;
     if (has_superchip8_quirks)
-        V[(int)SECOND_DEG(opcode)] <<= 1;
+        V[SECOND(opcode)] <<= 1;
     else
-        V[(int)THIRD_DEG(opcode)] = V[(int)SECOND_DEG(opcode)] << 1;
+        V[THIRD(opcode)] = V[SECOND(opcode)] << 1;
     V[0xf] = vf;
-    debug_printf("EXECUTED: SHL V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    debug_printf("EXECUTED: SHL V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
 unsigned int skip_not_equal_reg(unsigned short opcode) {
-    if (V[(int)THIRD_DEG(opcode)] != V[(int)SECOND_DEG(opcode)]) {
+    if (V[THIRD(opcode)] != V[SECOND(opcode)]) {
         pc += 2;
     }
-    debug_printf("EXECUTED: SNE V%x, V%x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode));
+    debug_printf("EXECUTED: SNE V%x, V%x\n", THIRD(opcode), SECOND(opcode));
     return IDLE;
 }
 
@@ -387,156 +365,152 @@ unsigned int load_index(unsigned short opcode) {
 }
 
 unsigned int jump_reg(unsigned short opcode) {
-    pc = (ADDR(opcode)) + V[(has_superchip8_quirks) ? THIRD_DEG(opcode) : 0];
-    debug_printf("EXECUTED: JP V0, %04x\n", ADDR(opcode));
+    int reg = (has_superchip8_quirks) ? THIRD(opcode) : 0;
+    pc = ADDR(opcode) + V[reg];
+    debug_printf("EXECUTED: JP V%x, %04x\n", reg, ADDR(opcode));
     return IDLE;
 }
 
 unsigned int random_reg(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] = (rand() % 0x0100) & IMMEDIATE(opcode);
-    debug_printf("EXECUTED: RND V%x, %02x\n", THIRD_DEG(opcode),
-                 IMMEDIATE(opcode));
+    V[THIRD(opcode)] = (rand() % 0x0100) & IMMEDIATE(opcode);
+    debug_printf("EXECUTED: RND V%x, %02x\n", THIRD(opcode), IMMEDIATE(opcode));
     return IDLE;
 }
 
 unsigned int draw_op(unsigned short opcode) {
-    unsigned char vx = V[THIRD_DEG(opcode)];
-    unsigned char vy = V[SECOND_DEG(opcode)];
-    unsigned char n = FIRST_DEG(opcode);
+    unsigned char vx = V[THIRD(opcode)];
+    unsigned char n = FIRST(opcode);
     if (n == 0) n = 32;
-    unsigned char *video_mem = memory + START_VIDEO_MEM;
-    V[0xF] = 0;
+    unsigned char *video_mem = get_video_mem();
     int width = (hi_res) ? WIDTH : WIDTH / 2;
-    int height = HEIGTH;
-    if (!hi_res) {
-        height /= 2;
-    }
-    unsigned short y = (vy % height) * 16;
-    for (int i = 0; i < n && y < height * 16; i++) {
+    int height = (hi_res) ? HEIGTH : HEIGTH / 2;
+    const unsigned short start_y =
+        (V[SECOND(opcode)] % height) * NUM_BYTES_IN_ROW;
+    const unsigned short start_x = (vx % width) / 8;
+    int y = start_y;
+    V[0xf] = 0;
+
+    for (int i = 0; i < n && y < height * NUM_BYTES_IN_ROW; i++) {
+        // Get a row of a sprite
         unsigned int sprite_int = memory[I + i] << 24;
         if (n == 32) {
             sprite_int |= memory[I + i + 1] << 16;
             i++;
         }
         sprite_int >>= (vx % 8);
-        if (y < (vy % height) * 16) break;
-        for (int x = (vx % width) / 8; x < 16; x++) {
+
+        // Draw row
+        if (y < start_y) break;
+        for (int x = start_x; x < 16; x++) {
             unsigned char curr_byte = sprite_int >> 24;
             if ((video_mem[x + y] & curr_byte) != 0) {
-                V[0xF] = 1;
+                V[0xf] = 1;
             }
             sprite_int <<= 8;
             video_mem[x + y] ^= curr_byte;
         }
-        y += 16;
+        y += NUM_BYTES_IN_ROW;
     }
-    debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD_DEG(opcode),
-                 SECOND_DEG(opcode), FIRST_DEG(opcode));
-    return SET_XY((vx % width) / 8 + (vy % height) * 16) |
-           SET_N(FIRST_DEG(opcode)) | SET_FLAG((hi_res) ? DRAW_HI_RES : DRAW);
+
+    debug_printf("EXECUTED: DRW V%x, V%x, %x\n", THIRD(opcode), SECOND(opcode),
+                 FIRST(opcode));
+    return SET_XY(start_x + start_y) | SET_N(FIRST(opcode)) |
+           ((hi_res) ? DRAW_HI_RES : DRAW);
 }
 
 unsigned int skip_key_op(unsigned short opcode) {
-    skip_key(THIRD_DEG(opcode), true, KEYBOARD_UNSET);
-    debug_printf("EXECUTING: SKP V%x\n", THIRD_DEG(opcode));
+    skip_key(THIRD(opcode), true, KEYBOARD_UNSET);
+    debug_printf("EXECUTING: SKP V%x\n", THIRD(opcode));
     return KEYBOARD_NONBLOCKING;
 }
 
 unsigned int skip_not_key_op(unsigned short opcode) {
-    skip_key(THIRD_DEG(opcode), false, KEYBOARD_UNSET);
-    debug_printf("EXECUTING: SKNP V%x\n", THIRD_DEG(opcode));
+    skip_key(THIRD(opcode), false, KEYBOARD_UNSET);
+    debug_printf("EXECUTING: SKNP V%x\n", THIRD(opcode));
     return KEYBOARD_NONBLOCKING;
 }
 
 unsigned int delay_to_reg(unsigned short opcode) {
-    V[(int)THIRD_DEG(opcode)] = dt;
-    debug_printf("EXECUTED: LD V%x, DT\n", THIRD_DEG(opcode));
+    V[THIRD(opcode)] = dt;
+    debug_printf("EXECUTED: LD V%x, DT\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int key_to_reg(unsigned short opcode) {
-    load_key(THIRD_DEG(opcode), KEYBOARD_UNSET);
-    debug_printf("EXECUTING: LD V%x, K\n", THIRD_DEG(opcode));
+    load_key(THIRD(opcode), KEYBOARD_UNSET);
+    debug_printf("EXECUTING: LD V%x, K\n", THIRD(opcode));
     debug_printf("Waiting for keyboard input!");
     return KEYBOARD_BLOCKING;
 }
 
 unsigned int reg_to_delay(unsigned short opcode) {
-    dt = V[(int)THIRD_DEG(opcode)];
-    debug_printf("EXECUTED: LD DT, V%x\n", THIRD_DEG(opcode));
+    dt = V[THIRD(opcode)];
+    debug_printf("EXECUTED: LD DT, V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int reg_to_sound(unsigned short opcode) {
-    st = V[(int)THIRD_DEG(opcode)];
-    debug_printf("EXECUTED: LD ST, V%x\n", THIRD_DEG(opcode));
+    st = V[THIRD(opcode)];
+    debug_printf("EXECUTED: LD ST, V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int add_index_reg(unsigned short opcode) {
-    I += V[(int)THIRD_DEG(opcode)];
-    debug_printf("EXECUTED: ADD I, V%x\n", THIRD_DEG(opcode));
+    I += V[THIRD(opcode)];
+    debug_printf("EXECUTED: ADD I, V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int load_font(unsigned short opcode) {
-    I = (V[THIRD_DEG(opcode)] & 0x000F) * 5;
-    debug_printf("EXECUTED: LD F, V%x\n", THIRD_DEG(opcode));
+    I = (V[THIRD(opcode)] & 0x0f) * FONT_HEIGTH;
+    debug_printf("EXECUTED: LD F, V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int load_big_font(unsigned short opcode) {
-    I = BIG_FONT_OFFSET + (V[THIRD_DEG(opcode)] & 0x000F) * 10;
-    debug_printf("EXECUTED: LD HF, V%x\n", THIRD_DEG(opcode));
+    I = BIG_FONT_OFFSET + (V[THIRD(opcode)] & 0x0f) * BIG_FONT_HEIGTH;
+    debug_printf("EXECUTED: LD HF, V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int to_bcd(unsigned short opcode) {
-    int val = V[(int)THIRD_DEG(opcode)];
+    int val = V[THIRD(opcode)];
     for (int i = 2; i >= 0; i--) {
-        memory[(I + i) & 0xFFF] = val % 10;
+        memory[(I + i) & 0x0fff] = val % 10;
         val /= 10;
     }
-    debug_printf("EXECUTED: BCD V%x\n", THIRD_DEG(opcode));
+    debug_printf("EXECUTED: BCD V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int regs_to_memory(unsigned short opcode) {
-    for (int i = 0; i <= THIRD_DEG(opcode); i++) {
-        memory[I + i] = V[i];
-    }
-    if (!has_superchip8_quirks) I += (THIRD_DEG(opcode)) + 1;
-    debug_printf("EXECUTED: LD [%04x], V%x\n", I, THIRD_DEG(opcode));
+    memcpy(memory + I, V, THIRD(opcode) + 1);
+    if (!has_superchip8_quirks) I += THIRD(opcode) + 1;
+    debug_printf("EXECUTED: LD [I], V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int memory_to_regs(unsigned short opcode) {
-    for (int i = 0; i <= THIRD_DEG(opcode); i++) {
-        V[i] = memory[I + i];
-    }
-    if (!has_superchip8_quirks) I += (THIRD_DEG(opcode)) + 1;
-    debug_printf("EXECUTED: LD V%x, [%04x]\n", THIRD_DEG(opcode), I);
+    memcpy(V, memory + I, THIRD(opcode) + 1);
+    if (!has_superchip8_quirks) I += (THIRD(opcode)) + 1;
+    debug_printf("EXECUTED: LD V%x, [I]\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int regs_to_flags(unsigned short opcode) {
-    for (int i = 0; i <= THIRD_DEG(opcode); i++) {
-        flags[i] = V[i];
-    }
-    debug_printf("DECODED:  LD R, V%x\n", THIRD_DEG(opcode));
+    memcpy(flags, V, THIRD(opcode) + 1);
+    debug_printf("DECODED:  LD R, V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int flags_to_regs(unsigned short opcode) {
-    for (int i = 0; i <= THIRD_DEG(opcode); i++) {
-        V[i] = flags[i];
-    }
-    debug_printf("DECODED:  LD V%x, R\n", THIRD_DEG(opcode));
+    memcpy(V, flags, THIRD(opcode) + 1);
+    debug_printf("DECODED:  LD V%x, R\n", THIRD(opcode));
     return IDLE;
 }
 
 instruction decode8(unsigned short opcode) {
-    switch (FIRST_DEG(opcode)) {
+    switch (FIRST(opcode)) {
         case 0:
             debug_printf("DECODED:  LD Vx, Vy\n");
             return &load_reg;
@@ -561,7 +535,7 @@ instruction decode8(unsigned short opcode) {
         case 7:
             debug_printf("DECODED:  SUBN Vx, Vy\n");
             return &subtract_negated_reg;
-        case 0xE:
+        case 0xe:
             debug_printf("DECODED:  SHL Vx, Vy\n");
             return &shift_left_reg;
     }
@@ -570,11 +544,11 @@ instruction decode8(unsigned short opcode) {
 }
 
 instruction decodee(unsigned short opcode) {
-    switch (opcode & 0x00ff) {
-        case 0x9E:
+    switch (SECOND(opcode) << 4 | FIRST(opcode)) {
+        case 0x9e:
             debug_printf("DECODED:  SKP Vx\n");
             return &skip_key_op;
-        case 0xA1:
+        case 0xa1:
             debug_printf("DECODED:  SKNP Vx\n");
             return &skip_not_key_op;
     }
@@ -583,11 +557,11 @@ instruction decodee(unsigned short opcode) {
 }
 
 instruction decodef(unsigned short opcode) {
-    switch (opcode & 0x00ff) {
+    switch (SECOND(opcode) << 4 | FIRST(opcode)) {
         case 0x07:
             debug_printf("DECODED:  LD Vx, DT\n");
             return &delay_to_reg;
-        case 0x0A:
+        case 0x0a:
             debug_printf("DECODED:  LD Vx, K\n");
             return &key_to_reg;
         case 0x15:
@@ -596,7 +570,7 @@ instruction decodef(unsigned short opcode) {
         case 0x18:
             debug_printf("DECODED:  LD ST, Vx\n");
             return &reg_to_sound;
-        case 0x1E:
+        case 0x1e:
             debug_printf("DECODED:  ADD I, Vx\n");
             return &add_index_reg;
         case 0x29:
@@ -626,30 +600,30 @@ instruction decodef(unsigned short opcode) {
 }
 
 instruction decode0(unsigned short opcode) {
-    switch (opcode & 0x00ff) {
-        case 0xE0:
+    switch (SECOND(opcode) << 4 | FIRST(opcode)) {
+        case 0xe0:
             debug_printf("DECODED:  CLS\n");
             return &clear_op;
-        case 0xEE:
+        case 0xee:
             debug_printf("DECODED:  RET\n");
             return &return_op;
-        case 0xFB:
+        case 0xfb:
             debug_printf("DECODED:  SCR\n");
             return &scroll_right;
-        case 0xFC:
+        case 0xfc:
             debug_printf("DECODED:  SCL\n");
             return &scroll_left;
-        case 0xFD:
+        case 0xfd:
             debug_printf("DECODED:  EXIT\n");
             return &exit_op;
-        case 0xFE:
+        case 0xfe:
             debug_printf("DECODED:  LOW\n");
             return &low_op;
-        case 0xFF:
+        case 0xff:
             debug_printf("DECODED:  HIGH\n");
             return &high_op;
     }
-    if ((opcode & 0x00f0) == 0xC0) {
+    if (SECOND(opcode) == 0xc) {
         debug_printf("DECODED:  SCD nibble\n");
         return &scroll_down;
     }
@@ -658,7 +632,7 @@ instruction decode0(unsigned short opcode) {
 }
 
 instruction decode(unsigned short opcode) {
-    switch (FOURTH_DEG(opcode)) {
+    switch (FOURTH(opcode)) {
         case 0:
             return decode0(opcode);
         case 1:
@@ -674,7 +648,7 @@ instruction decode(unsigned short opcode) {
             debug_printf("DECODED:  SNE Vx, byte\n");
             return &skip_not_equal_immediate;
         case 5:
-            if ((FIRST_DEG(opcode)) != 0) {
+            if (FIRST(opcode) != 0) {
                 return NULL;
             }
             debug_printf("DECODED:  SE Vx, Vy\n");
@@ -688,26 +662,26 @@ instruction decode(unsigned short opcode) {
         case 8:
             return decode8(opcode);
         case 9:
-            if ((FIRST_DEG(opcode)) != 0) {
+            if (FIRST(opcode) != 0) {
                 return NULL;
             }
             debug_printf("DECODED:  SNE Vx, Vy\n");
             return &skip_not_equal_reg;
-        case 0xA:
+        case 0xa:
             debug_printf("DECODED:  LD I, addr\n");
             return &load_index;
-        case 0xB:
+        case 0xb:
             debug_printf("DECODED:  JP V0, addr\n");
             return &jump_reg;
-        case 0xC:
+        case 0xc:
             debug_printf("DECODED:  RND Vx, byte\n");
             return &random_reg;
-        case 0xD:
+        case 0xd:
             debug_printf("DECODED:  DRW Vx, Vy, nibble\n");
             return &draw_op;
-        case 0xE:
+        case 0xe:
             return decodee(opcode);
-        case 0xF:
+        case 0xf:
             return decodef(opcode);
     }
     debug_printf("DECODED:  Illegal opcode\n");
