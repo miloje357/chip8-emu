@@ -10,5 +10,7 @@ void print_registers(unsigned char *regs);
 void print_stack(unsigned char *stack, unsigned char stack_size,
                  unsigned char sp);
 void print_memory(unsigned char *memory, unsigned short pc);
+void set_error(const char *new_err_msg);
+void print_error();
 
 #endif

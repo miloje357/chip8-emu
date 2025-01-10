@@ -7,20 +7,24 @@
 
 #include "debugger.h"
 
-#define PIXELS_TO_SCROLL_RL 4
-#define SIZE_MEMORY START_VIDEO_MEM + SIZE_VIDEO_MEM
+#define SIZE_MEMORY (START_VIDEO_MEM + SIZE_VIDEO_MEM)
 #define STACK_START 0xee0
 #define STACK_END 0xf00
+#define GET_FROM_MEM(addr) memory[(addr) % SIZE_MEMORY]
+
 #define FONT_HEIGTH 5
 #define BIG_FONT_HEIGTH 10
 #define BIG_FONT_OFFSET FONT_HEIGTH * 16
+
+#define PIXELS_TO_SCROLL_RL 4
+#define NUM_BYTES_IN_ROW (SIZE_VIDEO_MEM / HEIGTH)
+
 #define FIRST(opcode) (opcode & 0x000f)
 #define SECOND(opcode) ((opcode & 0x00f0) >> 4)
 #define THIRD(opcode) ((opcode & 0x0f00) >> 8)
 #define FOURTH(opcode) ((opcode & 0xf000) >> 12)
 #define IMMEDIATE(opcode) (opcode & 0x00ff)
 #define ADDR(opcode) (opcode & 0x0fff)
-#define NUM_BYTES_IN_ROW (SIZE_VIDEO_MEM / HEIGTH)
 
 typedef unsigned int (*instruction)(unsigned short);
 
@@ -114,7 +118,8 @@ int load_program(const char *program_path) {
         fclose(program);
         return 1;
     }
-    if (filesize >= STACK_END - PROGRAM_START) {
+    // NOTE: Not sure if program space and display buffer/stack should overlap
+    if (filesize >= SIZE_MEMORY - PROGRAM_START) {
         printf("Program too large.\n");
         fclose(program);
         return 1;
@@ -145,9 +150,8 @@ void print_state() {
 }
 
 unsigned short fetch() {
-    // TODO: Write error handling for pc >= SIZE_MEMORY
-    unsigned short opcode = memory[pc] << 8;
-    opcode |= memory[pc + 1];
+    unsigned short opcode = GET_FROM_MEM(pc) << 8;
+    opcode |= GET_FROM_MEM(pc + 1);
     pc += 2;
     return opcode;
 }
@@ -159,7 +163,7 @@ unsigned int clear_op(unsigned short opcode) {
 }
 
 unsigned int return_op(unsigned short opcode) {
-    // TODO: Write error handling for stack underflow
+    if (sp == 0xfe) return IDLE;
     pc = *(unsigned short *)(memory + STACK_START + sp);
     sp -= 2;
     debug_printf("EXECUTED: RET\n");
@@ -170,8 +174,8 @@ unsigned int scroll_down(unsigned short opcode) {
     unsigned char *video_mem = get_video_mem();
     unsigned char n = FIRST(opcode);
     // n /= (!hi_res) ? 2 : 1;
-    memcpy(video_mem + n * NUM_BYTES_IN_ROW, video_mem,
-           (HEIGTH - n) * NUM_BYTES_IN_ROW);
+    memmove(video_mem + n * NUM_BYTES_IN_ROW, video_mem,
+            (HEIGTH - n) * NUM_BYTES_IN_ROW);
     memset(video_mem, 0, n * NUM_BYTES_IN_ROW);
     debug_printf("EXECUTED: SCD nibble\n");
     return SET_HI_RES(hi_res) | SCROLL;
@@ -234,7 +238,10 @@ unsigned int jump(unsigned short opcode) {
 
 unsigned int call(unsigned short opcode) {
     sp += 2;
-    // TODO: Write error handling for stack overflow
+    if (sp >= STACK_END - STACK_START) {
+        set_error("Reached end of stack");
+        return EXIT;
+    }
     *(unsigned short *)(memory + STACK_START + sp) = pc;
     pc = ADDR(opcode);
     debug_printf("EXECUTED: CALL %04x\n", pc);
@@ -392,9 +399,9 @@ unsigned int draw_op(unsigned short opcode) {
 
     for (int i = 0; i < n && y < height * NUM_BYTES_IN_ROW; i++) {
         // Get a row of a sprite
-        unsigned int sprite_int = memory[I + i] << 24;
+        unsigned int sprite_int = GET_FROM_MEM(I + i) << 24;
         if (n == 32) {
-            sprite_int |= memory[I + i + 1] << 16;
+            sprite_int |= GET_FROM_MEM(I + i + 1) << 16;
             i++;
         }
         sprite_int >>= (vx % 8);
@@ -484,14 +491,14 @@ unsigned int to_bcd(unsigned short opcode) {
 }
 
 unsigned int regs_to_memory(unsigned short opcode) {
-    memcpy(memory + I, V, THIRD(opcode) + 1);
+    memcpy(memory + I % SIZE_MEMORY, V, THIRD(opcode) + 1);
     if (!has_superchip8_quirks) I += THIRD(opcode) + 1;
     debug_printf("EXECUTED: LD [I], V%x\n", THIRD(opcode));
     return IDLE;
 }
 
 unsigned int memory_to_regs(unsigned short opcode) {
-    memcpy(V, memory + I, THIRD(opcode) + 1);
+    memcpy(V, memory + I % SIZE_MEMORY, THIRD(opcode) + 1);
     if (!has_superchip8_quirks) I += (THIRD(opcode)) + 1;
     debug_printf("EXECUTED: LD V%x, [I]\n", THIRD(opcode));
     return IDLE;
@@ -634,6 +641,7 @@ instruction decode0(unsigned short opcode) {
 instruction decode(unsigned short opcode) {
     switch (FOURTH(opcode)) {
         case 0:
+            if (THIRD(opcode) != 0) break;
             return decode0(opcode);
         case 1:
             debug_printf("DECODED:  JP addr\n");
@@ -648,9 +656,7 @@ instruction decode(unsigned short opcode) {
             debug_printf("DECODED:  SNE Vx, byte\n");
             return &skip_not_equal_immediate;
         case 5:
-            if (FIRST(opcode) != 0) {
-                return NULL;
-            }
+            if (FIRST(opcode) != 0) break;
             debug_printf("DECODED:  SE Vx, Vy\n");
             return &skip_equal_reg;
         case 6:
@@ -662,9 +668,7 @@ instruction decode(unsigned short opcode) {
         case 8:
             return decode8(opcode);
         case 9:
-            if (FIRST(opcode) != 0) {
-                return NULL;
-            }
+            if (FIRST(opcode) != 0) break;
             debug_printf("DECODED:  SNE Vx, Vy\n");
             return &skip_not_equal_reg;
         case 0xa:

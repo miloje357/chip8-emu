@@ -12,7 +12,6 @@ A CHIP-8 emulator developed for educational purposes
 
 
 ## TODOs
- - [ ] Implement better memory menagment
  - [ ] Check for terminal size (see ioctl())
 
  - [x] A "debug" version that only displays the current cpu context, without no graphics and no sound
@@ -29,6 +28,7 @@ A CHIP-8 emulator developed for educational purposes
  - [x] Quirk menagment
  - [x] Better border (sometimes display clips the border)
  - [x] Add adjustable clock speed
+ - [x] Implement better memory menagment
  - [ ] Make a assembler and a disassembler
  - [ ] Make a better debugger
 

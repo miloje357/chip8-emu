@@ -181,5 +181,6 @@ int main(int argc, char *argv[]) {
         if (delta < tick_speed / 3) usleep(tick_speed / 3 - delta);
     }
     endwin();
+    print_error();
     return 0;
 }

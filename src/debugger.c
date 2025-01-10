@@ -9,6 +9,7 @@
 #define ANSI_COLOR_RESET "\x1b[0m"
 
 bool debug = false;
+const char *err_msg = NULL;
 
 void set_debug() { debug = true; }
 
@@ -70,4 +71,13 @@ void print_memory(unsigned char *memory, unsigned short pc) {
         }
         printf("\n");
     }
+}
+
+void set_error(const char *new_err_msg) {
+    err_msg = new_err_msg;
+}
+
+void print_error() {
+    if (err_msg == NULL) return;
+    printf("[CRASH] %s\n", err_msg);
 }
