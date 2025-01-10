@@ -1,25 +1,31 @@
 #include "graphics.h"
 
-#include <assert.h>
 #include <locale.h>
 #include <ncurses.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <unistd.h>
 
 #include "chip8.h"
 
-#define PIXEL_ON "██"
-#define PIXEL_OFF "  "
+#define SECONDS 1000000
+
 #define XSET_MESSAGE "Please run 'xset r rate 100' for better keyboard input"
 #define XSET_MESSAGE_TIME 10
+#define SMALL_WINDOW_MESSAGE "Please resize the window"
+
+#define PIXEL_ON "██"
+#define PIXEL_OFF "  "
 
 #define REAL_WIDTH 128
 #define REAL_HEIGHT 32
 #define NUM_BYTES_IN_ROW (SIZE_VIDEO_MEM / HEIGTH)
 #define DRAW_BORDER() draw_centered_border(REAL_HEIGHT + 2, REAL_WIDTH + 2)
+
+int win_h, win_w;
 
 void draw_border(int y, int x, int h, int w) {
     mvhline(y, x, 0, w);
@@ -33,25 +39,19 @@ void draw_border(int y, int x, int h, int w) {
 }
 
 void draw_centered_border(int h, int w) {
-    int scr_h, scr_w;
-    getmaxyx(stdscr, scr_h, scr_w);
-    draw_border((scr_h - h) / 2, (scr_w - w) / 2, h - 1, w - 1);
+    draw_border((win_h - h) / 2, (win_w - w) / 2, h - 1, w - 1);
 }
 
 void draw_pixel(int y, int x, bool is_on) {
-    int h, w;
-    getmaxyx(stdscr, h, w);
     const char *pixel = (is_on) ? PIXEL_ON : PIXEL_OFF;
-    mvaddstr((h - REAL_HEIGHT) / 2 + y, (w - REAL_WIDTH) / 2 + x * 2, pixel);
+    mvaddstr((win_h - REAL_HEIGHT) / 2 + y, (win_w - REAL_WIDTH) / 2 + x * 2,
+             pixel);
 }
 
 void draw_pixel_hi_res(int y, int x, bool is_on) {
-    int h, w;
-    getmaxyx(stdscr, h, w);
-    int start_x = (w - REAL_WIDTH) / 2;
-    int start_y = (h - REAL_HEIGHT) / 2;
+    int start_x = (win_w - REAL_WIDTH) / 2;
+    int start_y = (win_h - REAL_HEIGHT) / 2;
     unsigned short codepoint = mvinch(start_y + y / 2, start_x + x);
-    assert((codepoint >> 8) == 0x25 || codepoint == ' ');
 
     /* utf8 encoded block element characters
      * (with the added space)
@@ -93,6 +93,41 @@ void draw_pixel_hi_res(int y, int x, bool is_on) {
     mvaddstr(start_y + y / 2, start_x + x, pixel);
 }
 
+void display_small_window_message() {
+    clear();
+    draw_centered_border(3, strlen(SMALL_WINDOW_MESSAGE) + 2);
+    mvaddstr((win_h - 1) / 2, (win_w - strlen(SMALL_WINDOW_MESSAGE)) / 2,
+             SMALL_WINDOW_MESSAGE);
+    refresh();
+}
+
+void set_win_dimens() {
+    struct winsize ws;
+    ioctl(0, TIOCGWINSZ, &ws);
+    win_w = ws.ws_col;
+    win_h = ws.ws_row;
+}
+
+void handle_win_size(unsigned char *video_mem, bool hi_res) {
+    static int last_win_h, last_win_w;
+    set_win_dimens();
+    bool is_win_small = last_win_w != win_w || last_win_h != win_h;
+    if (is_win_small) {
+        draw_all(video_mem, hi_res);
+        last_win_w = win_w;
+        last_win_h = win_h;
+    }
+    while (win_h < REAL_HEIGHT || win_w < REAL_WIDTH) {
+        if (is_win_small) {
+            display_small_window_message();
+            last_win_w = win_w;
+            last_win_h = win_h;
+        }
+        set_win_dimens();
+        usleep(0.5 * SECONDS);
+    }
+}
+
 void init_graphics() {
     setlocale(LC_CTYPE, "");
     initscr();
@@ -100,6 +135,7 @@ void init_graphics() {
     noecho();
     nodelay(stdscr, true);
     curs_set(0);
+    set_win_dimens();
     DRAW_BORDER();
     refresh();
 }
@@ -166,24 +202,22 @@ void st_flash(bool is_pixel_on) {
     }
     was_pixel_on = is_pixel_on;
 
-    int h, w;
-    getmaxyx(stdscr, h, w);
     char pixel = (is_pixel_on) ? '@' : ' ';
-    int flash_h = (h - (REAL_HEIGHT + 2)) / 2;
-    char *pixels = malloc(w * flash_h + 1);
-    memset(pixels, pixel, w * flash_h);
-    pixels[w * flash_h + 1] = '\0';
+    int flash_h = (win_h - (REAL_HEIGHT + 2)) / 2;
+    char *pixels = malloc(win_w * flash_h + 1);
+    memset(pixels, pixel, win_w * flash_h);
+    pixels[win_w * flash_h + 1] = '\0';
     mvaddstr(0, 0, pixels);
-    mvaddstr((h + REAL_HEIGHT) / 2 + 1, 0, pixels);
+    mvaddstr((win_h + REAL_HEIGHT) / 2 + 1, 0, pixels);
     free(pixels);
 
-    int flash_w = (w - REAL_WIDTH) / 2;
+    int flash_w = (win_w - REAL_WIDTH) / 2;
     pixels = malloc(flash_w);
     memset(pixels, pixel, flash_w - 1);
     pixels[flash_w - 1] = '\0';
     for (int i = 0; i <= REAL_HEIGHT + 1; i++) {
         mvaddstr(flash_h + i, 0, pixels);
-        mvaddstr(flash_h + i, (w + REAL_WIDTH) / 2 + 1, pixels);
+        mvaddstr(flash_h + i, (win_w + REAL_WIDTH) / 2 + 1, pixels);
     }
     refresh();
     free(pixels);
@@ -196,20 +230,16 @@ unsigned long get_secs() {
 }
 
 void display_xset_message() {
-    int h, w;
-    getmaxyx(stdscr, h, w);
-    int y = (h - REAL_HEIGHT) / 4;
-    int x = (w - strlen(XSET_MESSAGE)) / 2;
+    int y = (win_h - REAL_HEIGHT) / 4;
+    int x = (win_w - strlen(XSET_MESSAGE)) / 2;
     draw_border(y - 1, x - 1, 2, strlen(XSET_MESSAGE) + 1);
     mvaddstr(y, x, XSET_MESSAGE);
     refresh();
 }
 
 void clear_xset_message() {
-    int h, w;
-    getmaxyx(stdscr, h, w);
-    int y = (h - REAL_HEIGHT) / 4 - 1;
-    int x = (w - strlen(XSET_MESSAGE)) / 2 - 1;
+    int y = (win_h - REAL_HEIGHT) / 4 - 1;
+    int x = (win_w - strlen(XSET_MESSAGE)) / 2 - 1;
     for (int i = 0; i < 3; i++) {
         move(y + i, x);
         clrtoeol();

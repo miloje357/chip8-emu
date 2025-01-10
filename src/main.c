@@ -88,7 +88,7 @@ void update_io(unsigned int sig, bool *keys) {
             break;
 
         case SCROLL:
-            draw_all(get_video_mem(), GET_HI_RES(sig));
+            draw_all(get_video_mem(), get_hi_res());
             break;
 
         case KEYBOARD_BLOCKING:
@@ -172,6 +172,7 @@ int main(int argc, char *argv[]) {
     unsigned int flag = IDLE;
     while (flag != EXIT) {
         unsigned long start = get_time();
+        handle_win_size(get_video_mem(), get_hi_res());
         handle_xset_message();
         flag = next_cycle();
         update_io(flag, is_key_pressed);

@@ -178,7 +178,7 @@ unsigned int scroll_down(unsigned short opcode) {
             (HEIGTH - n) * NUM_BYTES_IN_ROW);
     memset(video_mem, 0, n * NUM_BYTES_IN_ROW);
     debug_printf("EXECUTED: SCD nibble\n");
-    return SET_HI_RES(hi_res) | SCROLL;
+    return SCROLL;
 }
 
 unsigned int scroll_right(unsigned short opcode) {
@@ -194,7 +194,7 @@ unsigned int scroll_right(unsigned short opcode) {
         video_mem[j * NUM_BYTES_IN_ROW] >>= PIXELS_TO_SCROLL_RL;
     }
     debug_printf("EXECUTED: SCR\n");
-    return SET_HI_RES(hi_res) | SCROLL;
+    return SCROLL;
 }
 
 unsigned int scroll_left(unsigned short opcode) {
@@ -210,7 +210,7 @@ unsigned int scroll_left(unsigned short opcode) {
         video_mem[j * NUM_BYTES_IN_ROW - 1] <<= PIXELS_TO_SCROLL_RL;
     }
     debug_printf("EXECUTED: SCL\n");
-    return SET_HI_RES(hi_res) | SCROLL;
+    return SCROLL;
 }
 
 unsigned int exit_op(unsigned short opcode) {
@@ -730,3 +730,5 @@ Flag decrement_timers() {
 }
 
 void set_superchip8_quirks() { has_superchip8_quirks = true; }
+
+bool get_hi_res() { return hi_res; }

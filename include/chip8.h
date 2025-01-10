@@ -11,11 +11,8 @@
 
 #define GET_N(sig) (sig & 0x000000f0) >> 4
 #define GET_XY(sig) (sig & 0x00ffff00) >> 8
-#define GET_HI_RES(sig) (sig & 0x0f000000) >> 24
-
 #define SET_N(n) (n) << 4
 #define SET_XY(xy) (xy) << 8
-#define SET_HI_RES(hi_res) (hi_res) << 24
 
 typedef enum {
     IDLE,
@@ -38,5 +35,6 @@ Flag decrement_timers();
 void skip_key(unsigned char reg, bool is_equal, unsigned char key);
 void load_key(unsigned char reg, unsigned char key);
 void set_superchip8_quirks();
+bool get_hi_res();
 
 #endif

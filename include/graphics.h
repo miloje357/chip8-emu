@@ -8,5 +8,6 @@ void clear_screen();
 void st_flash(bool is_pixel_on);
 void handle_xset_message();
 void draw_all(unsigned char *video_mem, bool hi_res);
+void handle_win_size(unsigned char *video_mem, bool hi_res);
 
 #endif

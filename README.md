@@ -12,8 +12,6 @@ A CHIP-8 emulator developed for educational purposes
 
 
 ## TODOs
- - [ ] Check for terminal size (see ioctl())
-
  - [x] A "debug" version that only displays the current cpu context, without no graphics and no sound
     - With this version, I hope to run a simple "Sum of first n natural numbers" program
     - This version will only implement single-stepping
@@ -29,6 +27,7 @@ A CHIP-8 emulator developed for educational purposes
  - [x] Better border (sometimes display clips the border)
  - [x] Add adjustable clock speed
  - [x] Implement better memory menagment
+ - [x] Check for terminal size (see ioctl())
  - [ ] Make a assembler and a disassembler
  - [ ] Make a better debugger
 
