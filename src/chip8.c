@@ -8,8 +8,6 @@
 #include "debugger.h"
 
 #define SIZE_MEMORY (START_VIDEO_MEM + SIZE_VIDEO_MEM)
-#define STACK_START 0xee0
-#define STACK_END 0xf00
 #define GET_FROM_MEM(addr) memory[(addr) % SIZE_MEMORY]
 
 #define FONT_HEIGTH 5
