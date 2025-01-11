@@ -12,6 +12,8 @@ AC_CONFIG_HEADERS([config.h])
 AC_PROG_CC
 
 # Checks for libraries.
+PKG_CHECK_MODULES([NCURSES], [ncurses])
+AC_CHECK_LIB([ncurses], [initscr])
 
 # Checks for header files.
 
