@@ -1,4 +1,5 @@
-bin_PROGRAMS = chip8_emu
+bin_PROGRAMS = chip8_emu chip8_dasm
+
 chip8_emu_SOURCES = \
 	src/main.c\
 	src/chip8.c\
@@ -10,6 +11,12 @@ chip8_emu_SOURCES = \
 chip8_emu_CFLAGS = -g -Wall -Werror -O3\
 		    -I$(top_srcdir)/include\
 		    -lncurses
+
+chip8_dasm_SOURCES = \
+	src/dasm.c\
+	include/chip8.h
+chip8_dasm_CFLAGS = -g -Wall -Werror -O3\
+		    -I$(top_srcdir)/include
 
 CLEANFILES = config.log config.status
 MAINTAINERCLEANFILES = aclocal.m4 configure Makefile.in

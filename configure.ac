@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.72])
-AC_INIT([chip8-emu], [1.0.0], [https://github.com/miloje357/chip8-emu])
+AC_INIT([chip8-emu], [1.1.0], [https://github.com/miloje357/chip8-emu])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_HEADERS([config.h])
