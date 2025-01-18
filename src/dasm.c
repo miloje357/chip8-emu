@@ -1,8 +1,8 @@
-/* TODO: 1. Add labels
- *       2. Add the db directive
- *       3. Look for other features (see 6502 asm)
+/* TODO: 1. Add the db directive
+ *       2. Look for other features (see 6502 asm)
  */
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +51,7 @@ typedef struct {
     char first_arg[5];
     char second_arg[5];
     char third_arg[3];
+    char label[5];
 } AsmInst;
 
 AsmInst get_last_inst() {
@@ -166,62 +167,58 @@ void decodef(AsmInst *asm_inst, unsigned short opcode) {
     }
 }
 
-AsmInst decode(unsigned short opcode) {
-    AsmInst asm_inst;
-    memset(&asm_inst, 0, sizeof(AsmInst));
-
+void decode(AsmInst *dest, unsigned short opcode) {
     switch (FOURTH(opcode)) {
         case 0:
-            decode0(&asm_inst, opcode);
+            decode0(dest, opcode);
             break;
         case 1:
-            ONE_ARG_INST(asm_inst, opcode, "JP", ADR);
+            ONE_ARG_INST(*dest, opcode, "JP", ADR);
             break;
         case 2:
-            ONE_ARG_INST(asm_inst, opcode, "CALL", ADR);
+            ONE_ARG_INST(*dest, opcode, "CALL", ADR);
             break;
         case 3:
-            TWO_ARG_INST(asm_inst, opcode, "SE", VX, IMM);
+            TWO_ARG_INST(*dest, opcode, "SE", VX, IMM);
             break;
         case 4:
-            TWO_ARG_INST(asm_inst, opcode, "SNE", VX, IMM);
+            TWO_ARG_INST(*dest, opcode, "SNE", VX, IMM);
             break;
         case 5:
-            TWO_ARG_INST(asm_inst, opcode, "SE", VX, VY);
+            TWO_ARG_INST(*dest, opcode, "SE", VX, VY);
             break;
         case 6:
-            TWO_ARG_INST(asm_inst, opcode, "LD", VX, IMM);
+            TWO_ARG_INST(*dest, opcode, "LD", VX, IMM);
             break;
         case 7:
-            TWO_ARG_INST(asm_inst, opcode, "ADD", VX, IMM);
+            TWO_ARG_INST(*dest, opcode, "ADD", VX, IMM);
             break;
         case 8:
-            decode8(&asm_inst, opcode);
+            decode8(dest, opcode);
             break;
         case 9:
-            TWO_ARG_INST(asm_inst, opcode, "SNE", VX, VY);
+            TWO_ARG_INST(*dest, opcode, "SNE", VX, VY);
             break;
         case 0xa:
-            TWO_ARG_INST(asm_inst, opcode, "LD", "I", ADR);
+            TWO_ARG_INST(*dest, opcode, "LD", "I", ADR);
             break;
         case 0xb:
             // TODO: "V0"/VX : Depends on quirks
-            TWO_ARG_INST(asm_inst, opcode, "JP", "V0", ADR);
+            TWO_ARG_INST(*dest, opcode, "JP", "V0", ADR);
             break;
         case 0xc:
-            TWO_ARG_INST(asm_inst, opcode, "RND", VX, IMM);
+            TWO_ARG_INST(*dest, opcode, "RND", VX, IMM);
             break;
         case 0xd:
-            THREE_ARG_INST(asm_inst, opcode, "DRW", VX, VY, N);
+            THREE_ARG_INST(*dest, opcode, "DRW", VX, VY, N);
             break;
         case 0xe:
-            decodee(&asm_inst, opcode);
+            decodee(dest, opcode);
             break;
         case 0xf:
-            decodef(&asm_inst, opcode);
+            decodef(dest, opcode);
             break;
     }
-    return asm_inst;
 }
 
 // sets the current address as reachable, then changes the program counter
@@ -266,6 +263,18 @@ void set_is_reachable(bool *dest, unsigned char *bytes, size_t len,
     set_is_reachable(dest, bytes, len, pc + 2);
 }
 
+bool should_put_label(AsmInst asm_inst) {
+    return strcmp(asm_inst.inst, "JP") == 0 ||
+           strcmp(asm_inst.inst, "CALL") == 0 ||
+           (strcmp(asm_inst.inst, "LD") == 0 &&
+            strcmp(asm_inst.first_arg, "I") == 0);
+}
+
+void set_label(AsmInst *assembly, unsigned short addr) {
+    AsmInst *asm_inst_to_label = &assembly[(addr - 0x200) / 2];
+    sprintf(asm_inst_to_label->label, "L%03X", ADDR(addr));
+}
+
 // NOTE: Dissasembles SIZE_MEMORY bytes (currently it's 4864)
 AsmInst *disassemble(FILE *program_file) {
     unsigned char buffer[SIZE_MEMORY];
@@ -284,7 +293,9 @@ AsmInst *disassemble(FILE *program_file) {
     for (int i = 0; i < bytes_read; i++) {
         if (!is_reachable[i]) continue;
         unsigned short opcode = (buffer[i] << 8) | buffer[i + 1];
-        assembly[i / 2] = decode(opcode);
+        decode(&assembly[i / 2], opcode);
+        if (should_put_label(assembly[i / 2]))
+            set_label(assembly, ADDR(opcode));
         i++;
     }
     assembly[bytes_read / 2] = get_last_inst();
@@ -313,10 +324,13 @@ int main(int argc, char *argv[]) {
     fclose(program_file);
 
     for (int i = 0; !assembly[i].is_last_inst; i++) {
-        // 18 (sizeof(AsmInst)) - 1 (is_last_inst) + 1 ('\0')
-        char asm_inst_str[sizeof(AsmInst)];
+        if (strlen(assembly[i].label) != 0) {
+            printf("\n%s:\n", assembly[i].label);
+        }
+        // 23 (sizeof(AsmInst)) - 1 (is_last_inst) + 1 ('\0') + 5 (formating)
+        char asm_inst_str[sizeof(AsmInst) + 5];
         asm_inst_to_str(asm_inst_str, assembly[i]);
-        printf("%04X %s\n", 0x200 + i * 2, asm_inst_str);
+        printf("\t%s\n", asm_inst_str);
     }
     free(assembly);
     return 0;
