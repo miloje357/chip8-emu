@@ -1,3 +1,8 @@
+/* TODO: 1. Add labels
+ *       2. Add the db directive
+ *       3. Look for other features (see 6502 asm)
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -219,6 +224,48 @@ AsmInst decode(unsigned short opcode) {
     return asm_inst;
 }
 
+// sets the current address as reachable, then changes the program counter
+// accordingly
+void set_is_reachable(bool *dest, unsigned char *bytes, size_t len,
+                      unsigned short pc) {
+    if (pc >= len || dest[pc]) return;
+    dest[pc] = true;
+    dest[pc + 1] = true;
+    unsigned short opcode = (bytes[pc] << 8) | bytes[pc + 1];
+
+    // RET
+    if (opcode == 0x00ee) return;
+
+    switch (FOURTH(opcode)) {
+        case 1:
+            // JP addr
+            set_is_reachable(dest, bytes, len, ADDR(opcode) - 0x200);
+            return;
+        case 2:
+            // CALL addr
+            set_is_reachable(dest, bytes, len, ADDR(opcode) - 0x200);
+            break;
+        case 3:
+        case 4:
+        case 5:
+        case 9:
+            // SE, SNE
+            // check pc + 2, then returns to pc + 2
+            set_is_reachable(dest, bytes, len, pc + 4);
+            break;
+    }
+    // SKP, SKNP
+    if (FOURTH(opcode) == 0xe &&
+        (IMMEDIATE(opcode) == 0xa1 || IMMEDIATE(opcode) == 0x9e)) {
+        // check pc + 2, then returns to pc + 2
+        set_is_reachable(dest, bytes, len, pc + 4);
+    }
+
+    // go to next opcode
+    // TODO: Rewrite without unnecessary recursion
+    set_is_reachable(dest, bytes, len, pc + 2);
+}
+
 // NOTE: Dissasembles SIZE_MEMORY bytes (currently it's 4864)
 AsmInst *disassemble(FILE *program_file) {
     unsigned char buffer[SIZE_MEMORY];
@@ -228,15 +275,19 @@ AsmInst *disassemble(FILE *program_file) {
         return NULL;
     }
 
-    // TODO: Use jump instructions to determine what is the program and what
-    //       isn't
+    bool is_reachable[bytes_read];
+    memset(is_reachable, false, bytes_read);
+    set_is_reachable(is_reachable, buffer, bytes_read, 0);
+
     AsmInst *assembly = malloc(sizeof(AsmInst) * (bytes_read / 2 + 1));
-    int i;
-    for (i = 0; i < bytes_read / 2; i++) {
-        unsigned short opcode = (buffer[2 * i] << 8) | buffer[2 * i + 1];
-        assembly[i] = decode(opcode);
+    memset(assembly, 0, sizeof(AsmInst) * (bytes_read / 2 + 1));
+    for (int i = 0; i < bytes_read; i++) {
+        if (!is_reachable[i]) continue;
+        unsigned short opcode = (buffer[i] << 8) | buffer[i + 1];
+        assembly[i / 2] = decode(opcode);
+        i++;
     }
-    assembly[i] = get_last_inst();
+    assembly[bytes_read / 2] = get_last_inst();
     return assembly;
 }
 
@@ -249,7 +300,7 @@ int main(int argc, char *argv[]) {
     FILE *program_file = fopen(argv[1], "r");
     if (program_file == NULL) {
         printf("Error loading %s.\n", argv[1]);
-        printf("Exiting...");
+        printf("Exiting...\n");
         return 1;
     }
 
@@ -265,7 +316,7 @@ int main(int argc, char *argv[]) {
         // 18 (sizeof(AsmInst)) - 1 (is_last_inst) + 1 ('\0')
         char asm_inst_str[sizeof(AsmInst)];
         asm_inst_to_str(asm_inst_str, assembly[i]);
-        printf("%s\n", asm_inst_str);
+        printf("%04X %s\n", 0x200 + i * 2, asm_inst_str);
     }
     free(assembly);
     return 0;
