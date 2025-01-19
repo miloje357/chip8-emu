@@ -1,5 +1,7 @@
 /* TODO: 1. Add the db directive
- *       2. Look for other features (see 6502 asm)
+ *       2. Do TODOs
+ *       3. Refactor
+ *       4. Write dasm.h with docs
  */
 
 #include <stddef.h>
@@ -45,23 +47,27 @@
         set_arg((asm_inst).third_arg, arg3, opcode);                \
     }
 
+// TODO: Rewrite with char args[5][4] and int num_args
 typedef struct {
     bool is_last_inst;
+    bool is_directive;
     char inst[5];
     char first_arg[5];
     char second_arg[5];
-    char third_arg[3];
+    char third_arg[5];
+    char fourth_arg[5];
     char label[5];
-} AsmInst;
+} AsmStatement;
 
-AsmInst get_last_inst() {
-    AsmInst asm_inst;
-    memset(&asm_inst, 0, sizeof(AsmInst));
+// TODO: Instead of this, use num_statements from dissasemble
+AsmStatement get_last_inst() {
+    AsmStatement asm_inst;
+    memset(&asm_inst, 0, sizeof(AsmStatement));
     asm_inst.is_last_inst = true;
     return asm_inst;
 }
 
-void asm_inst_to_str(char *dest, AsmInst src) {
+void asm_inst_to_str(char *dest, AsmStatement src) {
     if (strlen(src.third_arg) != 0) {
         sprintf(dest, "%-4s %s, %s, %s", src.inst, src.first_arg,
                 src.second_arg, src.third_arg);
@@ -102,7 +108,7 @@ void set_arg(char *dest, const char *arg, unsigned short opcode) {
     strcpy(dest, arg);
 }
 
-void decode0(AsmInst *asm_inst, unsigned short opcode) {
+void decode0(AsmStatement *asm_inst, unsigned short opcode) {
     static const char *zero_opcodes[0x100] = {
         [0xe0] = "CLS",  [0xee] = "RET", [0xfb] = "SCR", [0xfc] = "SCL",
         [0xfd] = "EXIT", [0xfe] = "LOW", [0xff] = "HIGH"};
@@ -111,7 +117,7 @@ void decode0(AsmInst *asm_inst, unsigned short opcode) {
     ZERO_ARG_INST(*asm_inst, inst_op);
 }
 
-void decode8(AsmInst *asm_inst, unsigned short opcode) {
+void decode8(AsmStatement *asm_inst, unsigned short opcode) {
     static const char *eight_opcodes[0x10] = {
         "LD", "OR", "AND", "XOR", "ADD", "SUB", "SHR", "SUBN", [0xe] = "SHL"};
     const char *inst_op = eight_opcodes[FIRST(opcode)];
@@ -119,7 +125,7 @@ void decode8(AsmInst *asm_inst, unsigned short opcode) {
     TWO_ARG_INST(*asm_inst, opcode, inst_op, VX, VY);
 }
 
-void decodee(AsmInst *asm_inst, unsigned short opcode) {
+void decodee(AsmStatement *asm_inst, unsigned short opcode) {
     switch (SECOND(opcode) << 4 | FIRST(opcode)) {
         case 0x9e:
             ONE_ARG_INST(*asm_inst, opcode, "SKP", VX);
@@ -130,7 +136,7 @@ void decodee(AsmInst *asm_inst, unsigned short opcode) {
     }
 }
 
-void decodef(AsmInst *asm_inst, unsigned short opcode) {
+void decodef(AsmStatement *asm_inst, unsigned short opcode) {
     static const char *args[0x100] = {
         [0x07] = "DT",  [0x0a] = "K", [0x15] = "DT", [0x18] = "ST",
         [0x1e] = "I",   [0x29] = "F", [0x30] = "HF", [0x55] = "[I]",
@@ -167,7 +173,7 @@ void decodef(AsmInst *asm_inst, unsigned short opcode) {
     }
 }
 
-void decode(AsmInst *dest, unsigned short opcode) {
+void decode(AsmStatement *dest, unsigned short opcode) {
     switch (FOURTH(opcode)) {
         case 0:
             decode0(dest, opcode);
@@ -263,20 +269,23 @@ void set_is_reachable(bool *dest, unsigned char *bytes, size_t len,
     set_is_reachable(dest, bytes, len, pc + 2);
 }
 
-bool should_put_label(AsmInst asm_inst) {
+bool should_put_label(AsmStatement asm_inst) {
     return strcmp(asm_inst.inst, "JP") == 0 ||
            strcmp(asm_inst.inst, "CALL") == 0 ||
            (strcmp(asm_inst.inst, "LD") == 0 &&
             strcmp(asm_inst.first_arg, "I") == 0);
 }
 
-void set_label(AsmInst *assembly, unsigned short addr) {
-    AsmInst *asm_inst_to_label = &assembly[(addr - 0x200) / 2];
-    sprintf(asm_inst_to_label->label, "L%03X", ADDR(addr));
+int count_reachable(bool *src, size_t len) {
+    int count = 0;
+    for (size_t i = 0; i < len; i++) {
+        count += src[i];
+    }
+    return count;
 }
 
 // NOTE: Dissasembles SIZE_MEMORY bytes (currently it's 4864)
-AsmInst *disassemble(FILE *program_file) {
+AsmStatement *disassemble(FILE *program_file) {
     unsigned char buffer[SIZE_MEMORY];
     size_t bytes_read = fread(buffer, 1, SIZE_MEMORY, program_file);
     if (bytes_read == 0) {
@@ -287,18 +296,63 @@ AsmInst *disassemble(FILE *program_file) {
     bool is_reachable[bytes_read];
     memset(is_reachable, false, bytes_read);
     set_is_reachable(is_reachable, buffer, bytes_read, 0);
+    int num_reachable = count_reachable(is_reachable, bytes_read);
+    int num_statements = (num_reachable / 2) + (bytes_read - num_reachable) + 1;
 
-    AsmInst *assembly = malloc(sizeof(AsmInst) * (bytes_read / 2 + 1));
-    memset(assembly, 0, sizeof(AsmInst) * (bytes_read / 2 + 1));
+    AsmStatement *assembly = malloc(sizeof(AsmStatement) * num_statements);
+    memset(assembly, 0, sizeof(AsmStatement) * num_statements);
+    int count_unreachable = 0;
     for (int i = 0; i < bytes_read; i++) {
-        if (!is_reachable[i]) continue;
+        AsmStatement *curr_stat = &assembly[(i + count_unreachable) / 2];
+        if (!is_reachable[i]) {
+            count_unreachable++;
+            continue;
+        }
         unsigned short opcode = (buffer[i] << 8) | buffer[i + 1];
-        decode(&assembly[i / 2], opcode);
-        if (should_put_label(assembly[i / 2]))
-            set_label(assembly, ADDR(opcode));
+        decode(curr_stat, opcode);
         i++;
+        if (should_put_label(*curr_stat)) {
+            unsigned short addr = ADDR(opcode) - 0x200;
+            if (addr >= num_statements) continue;
+            AsmStatement *label_asm_stat =
+                &assembly[addr - count_reachable(is_reachable, addr) / 2];
+            sprintf(label_asm_stat->label, "L%03X", ADDR(opcode));
+        }
     }
-    assembly[bytes_read / 2] = get_last_inst();
+
+    AsmStatement *curr_dir = NULL;
+    int count_reachable = 0;
+    for (int i = 0; i < bytes_read; i++) {
+        if (is_reachable[i]) {
+            count_reachable++;
+            curr_dir = NULL;
+            continue;
+        }
+        if (curr_dir == NULL || strlen(curr_dir->fourth_arg) != 0 ||
+            strlen(assembly[i - count_reachable / 2].label) != 0) {
+            curr_dir = &assembly[i - count_reachable / 2];
+            if (strlen(curr_dir->label) == 0) {
+                sprintf(curr_dir->label, "L%03X", (0x200 + i) & 0xfff);
+            }
+            strcpy(curr_dir->inst, ".db");
+            sprintf(curr_dir->first_arg, "0x%02X", buffer[i]);
+            curr_dir->is_directive = true;
+            continue;
+        }
+        if (strlen(curr_dir->second_arg) == 0) {
+            sprintf(curr_dir->second_arg, "0x%02X", buffer[i]);
+            continue;
+        }
+        if (strlen(curr_dir->third_arg) == 0) {
+            sprintf(curr_dir->third_arg, "0x%02X", buffer[i]);
+            continue;
+        }
+        if (strlen(curr_dir->fourth_arg) == 0) {
+            sprintf(curr_dir->fourth_arg, "0x%02X", buffer[i]);
+            continue;
+        }
+    }
+    assembly[num_statements - 1] = get_last_inst();
     return assembly;
 }
 
@@ -315,7 +369,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    AsmInst *assembly = disassemble(program_file);
+    AsmStatement *assembly = disassemble(program_file);
     if (assembly == NULL) {
         printf("Couldn't dissasemble program. Exiting...\n");
         fclose(program_file);
@@ -324,11 +378,19 @@ int main(int argc, char *argv[]) {
     fclose(program_file);
 
     for (int i = 0; !assembly[i].is_last_inst; i++) {
+        if (strlen(assembly[i].inst) == 0) continue;
+        if (assembly[i].is_directive) {
+            printf("%s: %-4s %s %s %s %s\n", assembly[i].label,
+                   assembly[i].inst, assembly[i].first_arg,
+                   assembly[i].second_arg, assembly[i].third_arg,
+                   assembly[i].fourth_arg);
+            continue;
+        }
         if (strlen(assembly[i].label) != 0) {
             printf("\n%s:\n", assembly[i].label);
         }
         // 23 (sizeof(AsmInst)) - 1 (is_last_inst) + 1 ('\0') + 5 (formating)
-        char asm_inst_str[sizeof(AsmInst) + 5];
+        char asm_inst_str[sizeof(AsmStatement) + 5];
         asm_inst_to_str(asm_inst_str, assembly[i]);
         printf("\t%s\n", asm_inst_str);
     }
