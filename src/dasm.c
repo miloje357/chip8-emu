@@ -262,6 +262,22 @@ int count_reachable(bool *src, size_t len) {
     return count;
 }
 
+AsmStatement *filter_empty(AsmStatement *src, size_t *num_statements) {
+    AsmStatement *filtered_assembly =
+        malloc(sizeof(AsmStatement) * *num_statements);
+    size_t count = 0;
+    for (size_t i = 0; i < *num_statements; i++) {
+        if (DOES_STR_EXIST(src[i].name)) {
+            filtered_assembly[count++] = src[i];
+        }
+    }
+    *num_statements = count;
+    filtered_assembly =
+        realloc(filtered_assembly, sizeof(AsmStatement) * *num_statements);
+    free(src);
+    return filtered_assembly;
+}
+
 // NOTE: Dissasembles SIZE_MEMORY bytes (currently it's 4864)
 AsmStatement *disassemble(FILE *program_file, size_t *num_statements) {
     unsigned char bytes[SIZE_MEMORY];
@@ -330,7 +346,8 @@ AsmStatement *disassemble(FILE *program_file, size_t *num_statements) {
         sprintf(curr_dir->args[curr_dir->num_args], "0x%02X", bytes[i]);
         curr_dir->num_args++;
     }
-    return assembly;
+
+    return filter_empty(assembly, num_statements);
 }
 
 void print_statement(AsmStatement stat) {
@@ -378,7 +395,6 @@ int main(int argc, char *argv[]) {
     fclose(program_file);
 
     for (int i = 0; i < len; i++) {
-        if (!DOES_STR_EXIST(assembly[i].name)) continue;
         print_statement(assembly[i]);
     }
     free(assembly);
