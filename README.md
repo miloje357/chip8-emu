@@ -29,6 +29,10 @@ make
  ```sh
 ./chip8_emu <rom file>
  ```
+ Also, a dissasembler is included:
+ ```sh
+./chip8_dasm <rom file>
+ ```
  You may also, clone the repo, run `autoreconf` and do steps 2. and 3. as described above:
 ```sh
 git clone https://github.com/miloje357/chip8-emu/
@@ -40,6 +44,7 @@ autoreconf -i
  - [ ] [Black Rainbow](https://johnearnest.github.io/chip8Archive/play.html?p=blackrainbow) Sometimes teleports to homescreen when entering a room
 
 ## Acknowledgements
+ - [wernsey/chip8](https://github.com/wernsey/chip8)
  - Documentation and other helpful sites:
    - [Cowgod's Chip-8 Technical Reference](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM)
    - [Awesome CHIP-8](https://chip-8.github.io/links/)

@@ -1,13 +1,10 @@
-/* TODO: 1. Do cleanup of empty dirs
- *       2. Write dasm.h with docs
- */
-
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "chip8.h"
+#include "dasm.h"
 
 #define MIN(a, b) ((a < b) ? a : b)
 #define DOES_STR_EXIST(str) (strlen(str) != 0)
@@ -49,15 +46,6 @@
         append_arg(inst, arg3, opcode);                           \
     }
 
-typedef struct {
-    bool is_last_inst;
-    bool is_directive;
-    char name[5];
-    char args[4][5];
-    unsigned char num_args;
-    char label[5];
-} AsmStatement;
-
 void append_arg(AsmStatement *inst, const char *arg, unsigned short opcode) {
     char *dest = inst->args[inst->num_args];
     inst->num_args++;
@@ -84,7 +72,7 @@ void append_arg(AsmStatement *inst, const char *arg, unsigned short opcode) {
     strcpy(dest, arg);
 }
 
-void decode0(AsmStatement *inst, unsigned short opcode) {
+void decode_zero(AsmStatement *inst, unsigned short opcode) {
     static const char *inst_names[0x100] = {
         [0xe0] = "CLS",  [0xee] = "RET", [0xfb] = "SCR", [0xfc] = "SCL",
         [0xfd] = "EXIT", [0xfe] = "LOW", [0xff] = "HIGH"};
@@ -94,7 +82,7 @@ void decode0(AsmStatement *inst, unsigned short opcode) {
     ZERO_ARG_INST(inst, inst_name);
 }
 
-void decode8(AsmStatement *inst, unsigned short opcode) {
+void decode_eight(AsmStatement *inst, unsigned short opcode) {
     static const char *inst_names[0x10] = {
         "LD", "OR", "AND", "XOR", "ADD", "SUB", "SHR", "SUBN", [0xe] = "SHL"};
     const char *inst_name = inst_names[FIRST(opcode)];
@@ -103,7 +91,7 @@ void decode8(AsmStatement *inst, unsigned short opcode) {
     TWO_ARG_INST(inst, opcode, inst_name, VX_ARG, VY_ARG);
 }
 
-void decodee(AsmStatement *inst, unsigned short opcode) {
+void decode_e(AsmStatement *inst, unsigned short opcode) {
     switch (FIRST_HALF(opcode)) {
         case 0x9e:
             ONE_ARG_INST(inst, opcode, "SKP", VX_ARG);
@@ -114,7 +102,7 @@ void decodee(AsmStatement *inst, unsigned short opcode) {
     }
 }
 
-void decodef(AsmStatement *inst, unsigned short opcode) {
+void decode_f(AsmStatement *inst, unsigned short opcode) {
     static const char *inst_args[0x100] = {
         [0x07] = "DT",  [0x0a] = "K", [0x15] = "DT", [0x18] = "ST",
         [0x1e] = "I",   [0x29] = "F", [0x30] = "HF", [0x55] = "[I]",
@@ -153,10 +141,10 @@ void decodef(AsmStatement *inst, unsigned short opcode) {
 }
 
 // Decodes the opcode to an instruction, and puts it in the dest
-void decode(AsmStatement *inst, unsigned short opcode) {
+void decode_dasm(AsmStatement *inst, unsigned short opcode) {
     switch (FOURTH(opcode)) {
         case 0:
-            decode0(inst, opcode);
+            decode_zero(inst, opcode);
             break;
         case 1:
             ONE_ARG_INST(inst, opcode, "JP", ADDR_ARG);
@@ -180,7 +168,7 @@ void decode(AsmStatement *inst, unsigned short opcode) {
             TWO_ARG_INST(inst, opcode, "ADD", VX_ARG, IMM_ARG);
             break;
         case 8:
-            decode8(inst, opcode);
+            decode_eight(inst, opcode);
             break;
         case 9:
             TWO_ARG_INST(inst, opcode, "SNE", VX_ARG, VY_ARG);
@@ -199,10 +187,10 @@ void decode(AsmStatement *inst, unsigned short opcode) {
             THREE_ARG_INST(inst, opcode, "DRW", VX_ARG, VY_ARG, N_ARG);
             break;
         case 0xe:
-            decodee(inst, opcode);
+            decode_e(inst, opcode);
             break;
         case 0xf:
-            decodef(inst, opcode);
+            decode_f(inst, opcode);
             break;
     }
 }
@@ -307,7 +295,7 @@ AsmStatement *disassemble(FILE *program_file, size_t *num_statements) {
         // This is an instruction
         AsmStatement *curr_inst = &assembly[(i + unreachable_count) / 2];
         unsigned short opcode = (bytes[i] << 8) | bytes[i + 1];
-        decode(curr_inst, opcode);
+        decode_dasm(curr_inst, opcode);
         i++;  // Instructions occupy two bytes
 
         // Set lable
@@ -348,55 +336,4 @@ AsmStatement *disassemble(FILE *program_file, size_t *num_statements) {
     }
 
     return filter_empty(assembly, num_statements);
-}
-
-void print_statement(AsmStatement stat) {
-    if (stat.is_directive) {
-        printf("%s: %s %s", stat.label, stat.name, stat.args[0]);
-        for (int i = 1; i < stat.num_args; i++) {
-            printf(" %s", stat.args[i]);
-        }
-        printf("\n");
-        return;
-    }
-    if (DOES_STR_EXIST(stat.label)) {
-        printf("\n%s:\n", stat.label);
-    }
-    printf("\t%s", stat.name);
-    for (int i = 0; i < stat.num_args - 1; i++) {
-        printf(" %s,", stat.args[i]);
-    }
-    if (stat.num_args != 0) {
-        printf(" %s", stat.args[stat.num_args - 1]);
-    }
-    printf("\n");
-}
-
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Usage: ./chip8_dasm <program_path>\n");
-        return 1;
-    }
-
-    FILE *program_file = fopen(argv[1], "r");
-    if (program_file == NULL) {
-        printf("Error loading %s.\n", argv[1]);
-        printf("Exiting...\n");
-        return 1;
-    }
-
-    size_t len;
-    AsmStatement *assembly = disassemble(program_file, &len);
-    if (assembly == NULL) {
-        printf("Couldn't dissasemble program. Exiting...\n");
-        fclose(program_file);
-        return 1;
-    }
-    fclose(program_file);
-
-    for (int i = 0; i < len; i++) {
-        print_statement(assembly[i]);
-    }
-    free(assembly);
-    return 0;
 }

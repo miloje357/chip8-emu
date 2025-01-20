@@ -14,6 +14,8 @@ chip8_emu_CFLAGS = -g -Wall -Werror -O3\
 
 chip8_dasm_SOURCES = \
 	src/dasm.c\
+	src/dasm_main.c\
+	include/dasm.h\
 	include/chip8.h
 chip8_dasm_CFLAGS = -g -Wall -Werror -O3\
 		    -I$(top_srcdir)/include
