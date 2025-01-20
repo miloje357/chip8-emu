@@ -1,7 +1,5 @@
-/* TODO: 1. Add the db directive
- *       2. Do TODOs
- *       3. Refactor
- *       4. Write dasm.h with docs
+/* TODO: 1. Do cleanup of empty dirs
+ *       2. Write dasm.h with docs
  */
 
 #include <stddef.h>
@@ -11,153 +9,132 @@
 
 #include "chip8.h"
 
+#define MIN(a, b) ((a < b) ? a : b)
+#define DOES_STR_EXIST(str) (strlen(str) != 0)
+
 #define SIZE_MEMORY (START_VIDEO_MEM + SIZE_VIDEO_MEM)
 
 #define FIRST(op) (op & 0x000f)
 #define SECOND(op) ((op & 0x00f0) >> 4)
 #define THIRD(op) ((op & 0x0f00) >> 8)
 #define FOURTH(op) (op >> 12)
+#define FIRST_HALF(op) (op & 0x00ff)
 
 #define IMMEDIATE(op) (op & 0x00ff)
 #define ADDR(op) (op & 0x0fff)
 
-#define VX "VX"
-#define VY "VY"
-#define N "N"
-#define ADR "ADR"
-#define IMM "IMM"
+#define VX_ARG "VX_ARG"
+#define VY_ARG "VY_ARG"
+#define N_ARG "N_ARG"
+#define ADDR_ARG "ADDR_ARG"
+#define IMM_ARG "IMM_ARG"
 
-#define ZERO_ARG_INST(asm_inst, inst_op) strcpy((asm_inst).inst, inst_op)
-#define ONE_ARG_INST(asm_inst, opcode, inst_op, arg1) \
-    {                                                 \
-        strcpy((asm_inst).inst, inst_op);             \
-        set_arg((asm_inst).first_arg, arg1, opcode);  \
+#define ZERO_ARG_INST(inst, inst_name) strcpy(inst->name, inst_name)
+#define ONE_ARG_INST(inst, opcode, inst_name, arg1) \
+    {                                               \
+        strcpy(inst->name, inst_name);              \
+        append_arg(inst, arg1, opcode);             \
     }
-#define TWO_ARG_INST(asm_inst, opcode, inst_op, arg1, arg2) \
-    {                                                       \
-        strcpy((asm_inst).inst, inst_op);                   \
-        set_arg((asm_inst).first_arg, arg1, opcode);        \
-        set_arg((asm_inst).second_arg, arg2, opcode);       \
+#define TWO_ARG_INST(inst, opcode, inst_name, arg1, arg2) \
+    {                                                     \
+        strcpy(inst->name, inst_name);                    \
+        append_arg(inst, arg1, opcode);                   \
+        append_arg(inst, arg2, opcode);                   \
     }
-#define THREE_ARG_INST(asm_inst, opcode, inst_op, arg1, arg2, arg3) \
-    {                                                               \
-        strcpy((asm_inst).inst, inst_op);                           \
-        set_arg((asm_inst).first_arg, arg1, opcode);                \
-        set_arg((asm_inst).second_arg, arg2, opcode);               \
-        set_arg((asm_inst).third_arg, arg3, opcode);                \
+#define THREE_ARG_INST(inst, opcode, inst_name, arg1, arg2, arg3) \
+    {                                                             \
+        strcpy(inst->name, inst_name);                            \
+        append_arg(inst, arg1, opcode);                           \
+        append_arg(inst, arg2, opcode);                           \
+        append_arg(inst, arg3, opcode);                           \
     }
 
-// TODO: Rewrite with char args[5][4] and int num_args
 typedef struct {
     bool is_last_inst;
     bool is_directive;
-    char inst[5];
-    char first_arg[5];
-    char second_arg[5];
-    char third_arg[5];
-    char fourth_arg[5];
+    char name[5];
+    char args[4][5];
+    unsigned char num_args;
     char label[5];
 } AsmStatement;
 
-// TODO: Instead of this, use num_statements from dissasemble
-AsmStatement get_last_inst() {
-    AsmStatement asm_inst;
-    memset(&asm_inst, 0, sizeof(AsmStatement));
-    asm_inst.is_last_inst = true;
-    return asm_inst;
-}
-
-void asm_inst_to_str(char *dest, AsmStatement src) {
-    if (strlen(src.third_arg) != 0) {
-        sprintf(dest, "%-4s %s, %s, %s", src.inst, src.first_arg,
-                src.second_arg, src.third_arg);
-        return;
-    }
-    if (strlen(src.second_arg) != 0) {
-        sprintf(dest, "%-4s %s, %s", src.inst, src.first_arg, src.second_arg);
-        return;
-    }
-    if (strlen(src.first_arg) != 0) {
-        sprintf(dest, "%-4s %s", src.inst, src.first_arg);
-        return;
-    }
-    sprintf(dest, "%-4s", src.inst);
-}
-
-void set_arg(char *dest, const char *arg, unsigned short opcode) {
-    if (strcmp(arg, VX) == 0) {
+void append_arg(AsmStatement *inst, const char *arg, unsigned short opcode) {
+    char *dest = inst->args[inst->num_args];
+    inst->num_args++;
+    if (strcmp(arg, VX_ARG) == 0) {
         sprintf(dest, "V%X", THIRD(opcode));
         return;
     }
-    if (strcmp(arg, VY) == 0) {
+    if (strcmp(arg, VY_ARG) == 0) {
         sprintf(dest, "V%X", SECOND(opcode));
         return;
     }
-    if (strcmp(arg, N) == 0) {
+    if (strcmp(arg, N_ARG) == 0) {
         sprintf(dest, "%d", FIRST(opcode));
         return;
     }
-    if (strcmp(arg, ADR) == 0) {
+    if (strcmp(arg, ADDR_ARG) == 0) {
         sprintf(dest, "L%03X", ADDR(opcode));
         return;
     }
-    if (strcmp(arg, IMM) == 0) {
+    if (strcmp(arg, IMM_ARG) == 0) {
         sprintf(dest, "%d", IMMEDIATE(opcode));
         return;
     }
     strcpy(dest, arg);
 }
 
-void decode0(AsmStatement *asm_inst, unsigned short opcode) {
-    static const char *zero_opcodes[0x100] = {
+void decode0(AsmStatement *inst, unsigned short opcode) {
+    static const char *inst_names[0x100] = {
         [0xe0] = "CLS",  [0xee] = "RET", [0xfb] = "SCR", [0xfc] = "SCL",
         [0xfd] = "EXIT", [0xfe] = "LOW", [0xff] = "HIGH"};
-    const char *inst_op = zero_opcodes[SECOND(opcode) << 4 | FIRST(opcode)];
-    if (inst_op == NULL) return;
-    ZERO_ARG_INST(*asm_inst, inst_op);
+    const char *inst_name = inst_names[FIRST_HALF(opcode)];
+    if (inst_name == NULL) return;
+    // All 0xxx instructions have no arguments and are of the form 00xx
+    ZERO_ARG_INST(inst, inst_name);
 }
 
-void decode8(AsmStatement *asm_inst, unsigned short opcode) {
-    static const char *eight_opcodes[0x10] = {
+void decode8(AsmStatement *inst, unsigned short opcode) {
+    static const char *inst_names[0x10] = {
         "LD", "OR", "AND", "XOR", "ADD", "SUB", "SHR", "SUBN", [0xe] = "SHL"};
-    const char *inst_op = eight_opcodes[FIRST(opcode)];
-    if (inst_op == NULL) return;
-    TWO_ARG_INST(*asm_inst, opcode, inst_op, VX, VY);
+    const char *inst_name = inst_names[FIRST(opcode)];
+    if (inst_name == NULL) return;
+    // All 8xxx instructions have two registers as arguments
+    TWO_ARG_INST(inst, opcode, inst_name, VX_ARG, VY_ARG);
 }
 
-void decodee(AsmStatement *asm_inst, unsigned short opcode) {
-    switch (SECOND(opcode) << 4 | FIRST(opcode)) {
+void decodee(AsmStatement *inst, unsigned short opcode) {
+    switch (FIRST_HALF(opcode)) {
         case 0x9e:
-            ONE_ARG_INST(*asm_inst, opcode, "SKP", VX);
+            ONE_ARG_INST(inst, opcode, "SKP", VX_ARG);
             break;
         case 0xa1:
-            ONE_ARG_INST(*asm_inst, opcode, "SKNP", VX);
+            ONE_ARG_INST(inst, opcode, "SKNP", VX_ARG);
             break;
     }
 }
 
-void decodef(AsmStatement *asm_inst, unsigned short opcode) {
-    static const char *args[0x100] = {
+void decodef(AsmStatement *inst, unsigned short opcode) {
+    static const char *inst_args[0x100] = {
         [0x07] = "DT",  [0x0a] = "K", [0x15] = "DT", [0x18] = "ST",
         [0x1e] = "I",   [0x29] = "F", [0x30] = "HF", [0x55] = "[I]",
         [0x65] = "[I]", [0x75] = "R", [0x85] = "R"};
 
-    unsigned char second_half = SECOND(opcode) << 4 | FIRST(opcode);
-
-    if (second_half == 0x33) {
-        ONE_ARG_INST(*asm_inst, opcode, "BCD", VX);
+    if (FIRST_HALF(opcode) == 0x33) {
+        ONE_ARG_INST(inst, opcode, "BCD", VX_ARG);
         return;
     }
 
-    const char *arg = args[second_half];
+    const char *arg = inst_args[FIRST_HALF(opcode)];
     if (arg == NULL) return;
 
-    switch (second_half) {
+    switch (FIRST_HALF(opcode)) {
         case 0x07:
         case 0x0a:
         case 0x65:
         case 0x85:
-            TWO_ARG_INST(*asm_inst, opcode, "LD", VX, arg);
+            // These instructions are of the form LD Vx, **
+            TWO_ARG_INST(inst, opcode, "LD", VX_ARG, arg);
             break;
         case 0x15:
         case 0x18:
@@ -165,64 +142,67 @@ void decodef(AsmStatement *asm_inst, unsigned short opcode) {
         case 0x30:
         case 0x55:
         case 0x75:
-            TWO_ARG_INST(*asm_inst, opcode, "LD", arg, VX);
+            // These instructions are of the form LD **, Vx
+            TWO_ARG_INST(inst, opcode, "LD", arg, VX_ARG);
             break;
         case 0x1e:
-            TWO_ARG_INST(*asm_inst, opcode, "ADD", arg, VX);
+            // ADD I, Vx
+            TWO_ARG_INST(inst, opcode, "ADD", arg, VX_ARG);
             break;
     }
 }
 
-void decode(AsmStatement *dest, unsigned short opcode) {
+// Decodes the opcode to an instruction, and puts it in the dest
+void decode(AsmStatement *inst, unsigned short opcode) {
     switch (FOURTH(opcode)) {
         case 0:
-            decode0(dest, opcode);
+            decode0(inst, opcode);
             break;
         case 1:
-            ONE_ARG_INST(*dest, opcode, "JP", ADR);
+            ONE_ARG_INST(inst, opcode, "JP", ADDR_ARG);
             break;
         case 2:
-            ONE_ARG_INST(*dest, opcode, "CALL", ADR);
+            ONE_ARG_INST(inst, opcode, "CALL", ADDR_ARG);
             break;
         case 3:
-            TWO_ARG_INST(*dest, opcode, "SE", VX, IMM);
+            TWO_ARG_INST(inst, opcode, "SE", VX_ARG, IMM_ARG);
             break;
         case 4:
-            TWO_ARG_INST(*dest, opcode, "SNE", VX, IMM);
+            TWO_ARG_INST(inst, opcode, "SNE", VX_ARG, IMM_ARG);
             break;
         case 5:
-            TWO_ARG_INST(*dest, opcode, "SE", VX, VY);
+            TWO_ARG_INST(inst, opcode, "SE", VX_ARG, VY_ARG);
             break;
         case 6:
-            TWO_ARG_INST(*dest, opcode, "LD", VX, IMM);
+            TWO_ARG_INST(inst, opcode, "LD", VX_ARG, IMM_ARG);
             break;
         case 7:
-            TWO_ARG_INST(*dest, opcode, "ADD", VX, IMM);
+            TWO_ARG_INST(inst, opcode, "ADD", VX_ARG, IMM_ARG);
             break;
         case 8:
-            decode8(dest, opcode);
+            decode8(inst, opcode);
             break;
         case 9:
-            TWO_ARG_INST(*dest, opcode, "SNE", VX, VY);
+            TWO_ARG_INST(inst, opcode, "SNE", VX_ARG, VY_ARG);
             break;
         case 0xa:
-            TWO_ARG_INST(*dest, opcode, "LD", "I", ADR);
+            TWO_ARG_INST(inst, opcode, "LD", "I", ADDR_ARG);
             break;
         case 0xb:
-            // TODO: "V0"/VX : Depends on quirks
-            TWO_ARG_INST(*dest, opcode, "JP", "V0", ADR);
+            // TODO: "V0"/VX_ARG : Depends on quirks (Do when writing dasm.h)
+            TWO_ARG_INST(inst, opcode, "JP", "V0", ADDR_ARG);
             break;
         case 0xc:
-            TWO_ARG_INST(*dest, opcode, "RND", VX, IMM);
+            TWO_ARG_INST(inst, opcode, "RND", VX_ARG, IMM_ARG);
             break;
         case 0xd:
-            THREE_ARG_INST(*dest, opcode, "DRW", VX, VY, N);
+            THREE_ARG_INST(inst, opcode, "DRW", VX_ARG, VY_ARG, N_ARG);
             break;
         case 0xe:
-            decodee(dest, opcode);
+            decodee(inst, opcode);
             break;
         case 0xf:
-            decodef(dest, opcode);
+            decodef(inst, opcode);
             break;
     }
 }
@@ -259,7 +239,7 @@ void set_is_reachable(bool *dest, unsigned char *bytes, size_t len,
     }
     // SKP, SKNP
     if (FOURTH(opcode) == 0xe &&
-        (IMMEDIATE(opcode) == 0xa1 || IMMEDIATE(opcode) == 0x9e)) {
+        (FIRST_HALF(opcode) == 0xa1 || FIRST_HALF(opcode) == 0x9e)) {
         // check pc + 2, then returns to pc + 2
         set_is_reachable(dest, bytes, len, pc + 4);
     }
@@ -269,11 +249,9 @@ void set_is_reachable(bool *dest, unsigned char *bytes, size_t len,
     set_is_reachable(dest, bytes, len, pc + 2);
 }
 
-bool should_put_label(AsmStatement asm_inst) {
-    return strcmp(asm_inst.inst, "JP") == 0 ||
-           strcmp(asm_inst.inst, "CALL") == 0 ||
-           (strcmp(asm_inst.inst, "LD") == 0 &&
-            strcmp(asm_inst.first_arg, "I") == 0);
+bool should_put_label(AsmStatement inst) {
+    return strcmp(inst.name, "JP") == 0 || strcmp(inst.name, "CALL") == 0 ||
+           (strcmp(inst.name, "LD") == 0 && strcmp(inst.args[0], "I") == 0);
 }
 
 int count_reachable(bool *src, size_t len) {
@@ -285,9 +263,9 @@ int count_reachable(bool *src, size_t len) {
 }
 
 // NOTE: Dissasembles SIZE_MEMORY bytes (currently it's 4864)
-AsmStatement *disassemble(FILE *program_file) {
-    unsigned char buffer[SIZE_MEMORY];
-    size_t bytes_read = fread(buffer, 1, SIZE_MEMORY, program_file);
+AsmStatement *disassemble(FILE *program_file, size_t *num_statements) {
+    unsigned char bytes[SIZE_MEMORY];
+    size_t bytes_read = fread(bytes, 1, SIZE_MEMORY, program_file);
     if (bytes_read == 0) {
         printf("Couldn't read file.\n");
         return NULL;
@@ -295,65 +273,86 @@ AsmStatement *disassemble(FILE *program_file) {
 
     bool is_reachable[bytes_read];
     memset(is_reachable, false, bytes_read);
-    set_is_reachable(is_reachable, buffer, bytes_read, 0);
+    set_is_reachable(is_reachable, bytes, bytes_read, 0);
     int num_reachable = count_reachable(is_reachable, bytes_read);
-    int num_statements = (num_reachable / 2) + (bytes_read - num_reachable) + 1;
+    *num_statements = (num_reachable / 2) + (bytes_read - num_reachable) + 1;
+    AsmStatement *assembly = malloc(sizeof(AsmStatement) * *num_statements);
+    memset(assembly, 0, sizeof(AsmStatement) * *num_statements);
 
-    AsmStatement *assembly = malloc(sizeof(AsmStatement) * num_statements);
-    memset(assembly, 0, sizeof(AsmStatement) * num_statements);
-    int count_unreachable = 0;
+    // Decode instructions
+    int unreachable_count = 0;
     for (int i = 0; i < bytes_read; i++) {
-        AsmStatement *curr_stat = &assembly[(i + count_unreachable) / 2];
         if (!is_reachable[i]) {
-            count_unreachable++;
+            // This is not an instruction
+            unreachable_count++;
             continue;
         }
-        unsigned short opcode = (buffer[i] << 8) | buffer[i + 1];
-        decode(curr_stat, opcode);
-        i++;
-        if (should_put_label(*curr_stat)) {
+
+        // This is an instruction
+        AsmStatement *curr_inst = &assembly[(i + unreachable_count) / 2];
+        unsigned short opcode = (bytes[i] << 8) | bytes[i + 1];
+        decode(curr_inst, opcode);
+        i++;  // Instructions occupy two bytes
+
+        // Set lable
+        if (should_put_label(*curr_inst)) {
             unsigned short addr = ADDR(opcode) - 0x200;
-            if (addr >= num_statements) continue;
-            AsmStatement *label_asm_stat =
-                &assembly[addr - count_reachable(is_reachable, addr) / 2];
+            addr -= count_reachable(is_reachable, MIN(addr, bytes_read) / 2);
+            if (addr >= *num_statements) continue;
+            AsmStatement *label_asm_stat = &assembly[addr];
             sprintf(label_asm_stat->label, "L%03X", ADDR(opcode));
         }
     }
 
+    // Set directives (.db)
     AsmStatement *curr_dir = NULL;
-    int count_reachable = 0;
+    int reachable_count = 0;
     for (int i = 0; i < bytes_read; i++) {
         if (is_reachable[i]) {
-            count_reachable++;
+            // This is not a direcitve, move on
+            reachable_count++;
             curr_dir = NULL;
             continue;
         }
-        if (curr_dir == NULL || strlen(curr_dir->fourth_arg) != 0 ||
-            strlen(assembly[i - count_reachable / 2].label) != 0) {
-            curr_dir = &assembly[i - count_reachable / 2];
-            if (strlen(curr_dir->label) == 0) {
+
+        // This is a directive
+        if (curr_dir == NULL || curr_dir->num_args == 4 ||
+            DOES_STR_EXIST(assembly[i - reachable_count / 2].label)) {
+            // This is a new directive
+            curr_dir = &assembly[i - reachable_count / 2];
+            if (!DOES_STR_EXIST(curr_dir->label)) {
+                // There was no label prior to this
                 sprintf(curr_dir->label, "L%03X", (0x200 + i) & 0xfff);
             }
-            strcpy(curr_dir->inst, ".db");
-            sprintf(curr_dir->first_arg, "0x%02X", buffer[i]);
+            strcpy(curr_dir->name, ".db");
             curr_dir->is_directive = true;
-            continue;
         }
-        if (strlen(curr_dir->second_arg) == 0) {
-            sprintf(curr_dir->second_arg, "0x%02X", buffer[i]);
-            continue;
-        }
-        if (strlen(curr_dir->third_arg) == 0) {
-            sprintf(curr_dir->third_arg, "0x%02X", buffer[i]);
-            continue;
-        }
-        if (strlen(curr_dir->fourth_arg) == 0) {
-            sprintf(curr_dir->fourth_arg, "0x%02X", buffer[i]);
-            continue;
-        }
+        sprintf(curr_dir->args[curr_dir->num_args], "0x%02X", bytes[i]);
+        curr_dir->num_args++;
     }
-    assembly[num_statements - 1] = get_last_inst();
     return assembly;
+}
+
+void print_statement(AsmStatement stat) {
+    if (stat.is_directive) {
+        printf("%s: %s %s", stat.label, stat.name, stat.args[0]);
+        for (int i = 1; i < stat.num_args; i++) {
+            printf(" %s", stat.args[i]);
+        }
+        printf("\n");
+        return;
+    }
+    if (DOES_STR_EXIST(stat.label)) {
+        printf("\n%s:\n", stat.label);
+    }
+    printf("\t%s", stat.name);
+    for (int i = 0; i < stat.num_args - 1; i++) {
+        printf(" %s,", stat.args[i]);
+    }
+    if (stat.num_args != 0) {
+        printf(" %s", stat.args[stat.num_args - 1]);
+    }
+    printf("\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -369,7 +368,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    AsmStatement *assembly = disassemble(program_file);
+    size_t len;
+    AsmStatement *assembly = disassemble(program_file, &len);
     if (assembly == NULL) {
         printf("Couldn't dissasemble program. Exiting...\n");
         fclose(program_file);
@@ -377,22 +377,9 @@ int main(int argc, char *argv[]) {
     }
     fclose(program_file);
 
-    for (int i = 0; !assembly[i].is_last_inst; i++) {
-        if (strlen(assembly[i].inst) == 0) continue;
-        if (assembly[i].is_directive) {
-            printf("%s: %-4s %s %s %s %s\n", assembly[i].label,
-                   assembly[i].inst, assembly[i].first_arg,
-                   assembly[i].second_arg, assembly[i].third_arg,
-                   assembly[i].fourth_arg);
-            continue;
-        }
-        if (strlen(assembly[i].label) != 0) {
-            printf("\n%s:\n", assembly[i].label);
-        }
-        // 23 (sizeof(AsmInst)) - 1 (is_last_inst) + 1 ('\0') + 5 (formating)
-        char asm_inst_str[sizeof(AsmStatement) + 5];
-        asm_inst_to_str(asm_inst_str, assembly[i]);
-        printf("\t%s\n", asm_inst_str);
+    for (int i = 0; i < len; i++) {
+        if (!DOES_STR_EXIST(assembly[i].name)) continue;
+        print_statement(assembly[i]);
     }
     free(assembly);
     return 0;
