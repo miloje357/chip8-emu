@@ -24,6 +24,6 @@ typedef struct {
  * @return array of assembly statements
  * @since 1.1.0
  */
-AsmStatement *disassemble(FILE *program_file, size_t *num_statements);
+AsmStatement *disassemble(FILE *program_file, size_t *num_statements, bool has_quirks);
 
 #endif

@@ -206,7 +206,7 @@ void st_flash(bool is_pixel_on) {
     int flash_h = (win_h - (REAL_HEIGHT + 2)) / 2;
     char *pixels = malloc(win_w * flash_h + 1);
     memset(pixels, pixel, win_w * flash_h);
-    pixels[win_w * flash_h + 1] = '\0';
+    pixels[win_w * flash_h] = '\0';
     mvaddstr(0, 0, pixels);
     mvaddstr((win_h + REAL_HEIGHT) / 2 + 1, 0, pixels);
     free(pixels);

@@ -1,5 +1,8 @@
+#include <config.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
 #include "dasm.h"
 
 void print_statement(AsmStatement stat) {
@@ -24,21 +27,49 @@ void print_statement(AsmStatement stat) {
     printf("\n");
 }
 
+void print_help() {
+    printf("Usage: ./chip8_dasm [-sh] <program_path>\n");
+    printf("Options:\n");
+    printf(" -s                Enable super-chip8 quirks\n");
+    printf(" -h                Displays this message and version number\n");
+}
+
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Usage: ./chip8_dasm <program_path>\n");
+    bool has_superchip8_quirks = false;
+
+    char arg;
+    while ((arg = getopt(argc, argv, "sh")) != -1) {
+        switch (arg) {
+            case 's':
+                has_superchip8_quirks = true;
+                break;
+            case 'h':
+                printf("%s\n", PACKAGE_STRING);
+                print_help();
+                return 0;
+            default:
+                print_help();
+                return 1;
+        }
+    }
+
+    if (argc - 1 != optind) {
+        // There are more than one non-option arguments
+        print_help();
         return 1;
     }
 
-    FILE *program_file = fopen(argv[1], "r");
+    // Get the first non-option argument
+    FILE *program_file = fopen(argv[optind], "r");
     if (program_file == NULL) {
-        printf("Error loading %s.\n", argv[1]);
+        printf("Error loading %s.\n", argv[optind]);
         printf("Exiting...\n");
         return 1;
     }
 
     size_t len;
-    AsmStatement *assembly = disassemble(program_file, &len);
+    AsmStatement *assembly =
+        disassemble(program_file, &len, has_superchip8_quirks);
     if (assembly == NULL) {
         printf("Couldn't dissasemble program. Exiting...\n");
         fclose(program_file);

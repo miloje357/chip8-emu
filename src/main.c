@@ -1,5 +1,8 @@
+/* TODO: 1. Fix timing
+ */
 #include <config.h>
 #include <ncurses.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,9 +118,15 @@ void print_help() {
     printf(" -h                Displays this message and version number\n");
 }
 
+void program_exit() {
+    endwin();
+    print_error();
+}
+
 int main(int argc, char *argv[]) {
     int status;
     int tick_speed = DEFAULT_TICK_SPEED;
+    signal(SIGTERM, program_exit);
 
     char c;
     while ((c = getopt(argc, argv, "dst:h")) != -1) {
@@ -141,6 +150,14 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
+
+    if (argc - 1 != optind) {
+        // There are more than one non-option arguments
+        print_help();
+        return 1;
+    }
+
+    // Get the first non-option argument
     const char *program_path = argv[optind];
     if (program_path == NULL) {
         print_help();
@@ -181,7 +198,6 @@ int main(int argc, char *argv[]) {
         // divide by 3 because fetch-decode and then execute
         if (delta < tick_speed / 3) usleep(tick_speed / 3 - delta);
     }
-    endwin();
-    print_error();
+    program_exit();
     return 0;
 }

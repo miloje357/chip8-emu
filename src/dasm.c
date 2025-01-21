@@ -141,7 +141,7 @@ void decode_f(AsmStatement *inst, unsigned short opcode) {
 }
 
 // Decodes the opcode to an instruction, and puts it in the dest
-void decode_dasm(AsmStatement *inst, unsigned short opcode) {
+void decode_dasm(AsmStatement *inst, unsigned short opcode, bool has_quirks) {
     switch (FOURTH(opcode)) {
         case 0:
             decode_zero(inst, opcode);
@@ -177,7 +177,10 @@ void decode_dasm(AsmStatement *inst, unsigned short opcode) {
             TWO_ARG_INST(inst, opcode, "LD", "I", ADDR_ARG);
             break;
         case 0xb:
-            // TODO: "V0"/VX_ARG : Depends on quirks (Do when writing dasm.h)
+            if (has_quirks) {
+                TWO_ARG_INST(inst, opcode, "JP", VX_ARG, ADDR_ARG);
+                break;
+            }
             TWO_ARG_INST(inst, opcode, "JP", "V0", ADDR_ARG);
             break;
         case 0xc:
@@ -267,7 +270,7 @@ AsmStatement *filter_empty(AsmStatement *src, size_t *num_statements) {
 }
 
 // NOTE: Dissasembles SIZE_MEMORY bytes (currently it's 4864)
-AsmStatement *disassemble(FILE *program_file, size_t *num_statements) {
+AsmStatement *disassemble(FILE *program_file, size_t *num_statements, bool has_quirks) {
     unsigned char bytes[SIZE_MEMORY];
     size_t bytes_read = fread(bytes, 1, SIZE_MEMORY, program_file);
     if (bytes_read == 0) {
@@ -295,7 +298,7 @@ AsmStatement *disassemble(FILE *program_file, size_t *num_statements) {
         // This is an instruction
         AsmStatement *curr_inst = &assembly[(i + unreachable_count) / 2];
         unsigned short opcode = (bytes[i] << 8) | bytes[i + 1];
-        decode_dasm(curr_inst, opcode);
+        decode_dasm(curr_inst, opcode, has_quirks);
         i++;  // Instructions occupy two bytes
 
         // Set lable
