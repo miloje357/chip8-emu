@@ -1,5 +1,3 @@
-/* TODO: 1. Fix timing
- */
 #include <config.h>
 #include <ncurses.h>
 #include <signal.h>
@@ -100,7 +98,16 @@ void update_io(unsigned int sig, bool *keys) {
             break;
 
         case KEYBOARD_NONBLOCKING:
-            key = get_key(keys, KEYBOARD_NONBLOCKING);
+            if (get_debugging() != NO_DEBUGGING) {
+                // TODO: Figure out the best way to display this
+                
+                // mvprintw(1, 0, "PLEASE PRESS A KEY");
+                key = get_key(keys, KEYBOARD_BLOCKING);
+                // move(1, 0);
+                // clrtoeol();
+                // mvprintw(1, 0, "Key pressed: %x", key);
+            } else
+                key = get_key(keys, KEYBOARD_NONBLOCKING);
             skip_key(KEYBOARD_UNSET, KEYBOARD_UNSET, key);
             break;
 
@@ -110,9 +117,10 @@ void update_io(unsigned int sig, bool *keys) {
 }
 
 void print_help() {
-    printf("Usage: ./chip8_emu [-dsh] [-t <tick_speed>] <program_path>\n\n");
+    printf("Usage: ./chip8_emu [-dcsh] [-t <tick_speed>] <program_path>\n\n");
     printf("Options:\n");
-    printf(" -d                Enter debugging mode\n");
+    printf(" -d                Enter graphical debugging mode\n");
+    printf(" -c                Enter console debugging mode\n");
     printf(" -s                Enable super-chip8 quirks\n");
     printf(" -t <tick_speed>   Set tick speed (default 900)\n");
     printf(" -h                Displays this message and version number\n");
@@ -128,11 +136,14 @@ int main(int argc, char *argv[]) {
     int tick_speed = DEFAULT_TICK_SPEED;
     signal(SIGTERM, program_exit);
 
-    char c;
-    while ((c = getopt(argc, argv, "dst:h")) != -1) {
-        switch (c) {
+    char option;
+    while ((option = getopt(argc, argv, "dcst:h")) != -1) {
+        switch (option) {
             case 'd':
-                set_debug();
+                set_debugging(GRAPHIC_DEBUGGING);
+                break;
+            case 'c':
+                set_debugging(CONSOLE_DEBUGGING);
                 break;
             case 's':
                 set_superchip8_quirks();
@@ -174,7 +185,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    while (should_debug()) {
+    while (get_debugging() == CONSOLE_DEBUGGING) {
         // clear screen
         printf("\e[1;1H\e[2J");
         next_cycle();
@@ -188,8 +199,20 @@ int main(int argc, char *argv[]) {
     bool is_key_pressed[16];
     unsigned int flag = IDLE;
     while (flag != EXIT) {
-        unsigned long start = get_time();
         handle_win_size(get_video_mem(), get_hi_res());
+
+        if (get_debugging() == GRAPHIC_DEBUGGING) {
+            // Run the whole fetch-decode-execute cycle
+            for (int i = 0; i < 3; i++) {
+                flag = next_cycle();
+            }
+            update_io(flag, is_key_pressed);
+            while (getch() == ERR) usleep(1000);
+            continue;
+        }
+
+        // Run without debugging
+        unsigned long start = get_time();
         handle_xset_message();
         flag = next_cycle();
         update_io(flag, is_key_pressed);

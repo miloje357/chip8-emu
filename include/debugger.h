@@ -4,17 +4,30 @@
 #include <stdbool.h>
 
 /**
- * Turn on debugging mode
- * @since 0.1.0
+ * All the states of debugging
+ * @since 1.2.0
  */
-void set_debug();
+typedef enum {
+    NO_DEBUGGING,      /*>> Emulator runs normally*/
+    GRAPHIC_DEBUGGING, /*>> Emulator displays the graphics and some debugging
+                          information*/
+    CONSOLE_DEBUGGING  /*>> Emulator doesn't display graphics, only the current
+                          state*/
+} DebugType;
+
+/*
+ * Set the debugging mode
+ * @param type: proper DebugType
+ * @since 1.2.0
+ */
+void set_debugging(DebugType type);
 
 /**
  * Return the state of debugging
- * @return true if debugging is turned on, false otherwise
- * @since 0.1.0
+ * @return proper DebugType
+ * @since 1.2.0
  */
-bool should_debug();
+DebugType get_debugging();
 
 /**
  * Print to screen (like `printf()`) if debugging is turned on
@@ -23,7 +36,6 @@ bool should_debug();
  */
 void debug_printf(const char *format_string, ...)
     __attribute__((format(printf, 1, 2)));
-
 
 /**
  * Prints the state of registers

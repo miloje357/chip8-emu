@@ -1,3 +1,7 @@
+/* TODO: 1. Implement an assembly view
+ */
+#include "debugger.h"
+
 #include <ncurses.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -8,27 +12,32 @@
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
-bool debug = false;
 const char *err_msg = NULL;
+DebugType debug_state = NO_DEBUGGING;
 
-void set_debug() { debug = true; }
+void set_debugging(DebugType type) { debug_state = type; }
 
-bool should_debug() { return debug; }
+DebugType get_debugging() { return debug_state; }
 
 void debug_printf(const char *format, ...) {
-    if (!debug) {
-        /* char *str;
-        va_list args;
-        va_start(args, format);
-        vasprintf(&str, format, args);
-        va_end(args);
-        mvprintw(0, 0, "%s", str); */
-        return;
-    }
+    char *str;
     va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
+
+    switch (debug_state) {
+        case NO_DEBUGGING:
+            return;
+        case GRAPHIC_DEBUGGING:
+            // NOTE: Should delete before merge
+            va_start(args, format);
+            vasprintf(&str, format, args);
+            va_end(args);
+            mvprintw(0, 0, "%s", str);
+            return;
+        case CONSOLE_DEBUGGING:
+            va_start(args, format);
+            vprintf(format, args);
+            va_end(args);
+    }
 }
 
 void print_registers(unsigned char *regs) {
@@ -73,9 +82,7 @@ void print_memory(unsigned char *memory, unsigned short pc) {
     }
 }
 
-void set_error(const char *new_err_msg) {
-    err_msg = new_err_msg;
-}
+void set_error(const char *new_err_msg) { err_msg = new_err_msg; }
 
 void print_error() {
     if (err_msg == NULL) return;

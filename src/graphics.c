@@ -1,3 +1,5 @@
+/* TODO: 1. Emulation window positioning
+ */
 #include "graphics.h"
 
 #include <locale.h>
