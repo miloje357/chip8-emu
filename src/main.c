@@ -207,6 +207,7 @@ int main(int argc, char *argv[]) {
                 flag = next_cycle();
             }
             update_io(flag, is_key_pressed);
+            // TODO: Implement update_timers()
             while (getch() == ERR) usleep(1000);
             continue;
         }

@@ -1,3 +1,5 @@
+/* TODO: 1. Write a chip8-context struct
+*/
 #include "chip8.h"
 
 #include <stdbool.h>
@@ -135,6 +137,7 @@ int load_program(const char *program_path) {
     return 0;
 }
 
+// TODO: Move to src/debugger.c
 void print_state() {
     print_registers(V);
     printf("\n");

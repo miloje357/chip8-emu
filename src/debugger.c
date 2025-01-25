@@ -2,7 +2,7 @@
  */
 #include "debugger.h"
 
-#include <ncurses.h>
+// #include <ncurses.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -20,7 +20,7 @@ void set_debugging(DebugType type) { debug_state = type; }
 DebugType get_debugging() { return debug_state; }
 
 void debug_printf(const char *format, ...) {
-    char *str;
+    // char *str;
     va_list args;
 
     switch (debug_state) {
@@ -28,10 +28,12 @@ void debug_printf(const char *format, ...) {
             return;
         case GRAPHIC_DEBUGGING:
             // NOTE: Should delete before merge
+            /*
             va_start(args, format);
             vasprintf(&str, format, args);
             va_end(args);
             mvprintw(0, 0, "%s", str);
+            */
             return;
         case CONSOLE_DEBUGGING:
             va_start(args, format);
