@@ -1,10 +1,11 @@
+#include "dasm.h"
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "chip8.h"
-#include "dasm.h"
 
 #define MIN(a, b) ((a < b) ? a : b)
 #define DOES_STR_EXIST(str) (strlen(str) != 0)
@@ -270,7 +271,8 @@ AsmStatement *filter_empty(AsmStatement *src, size_t *num_statements) {
 }
 
 // NOTE: Dissasembles SIZE_MEMORY bytes (currently it's 4864)
-AsmStatement *disassemble(FILE *program_file, size_t *num_statements, bool has_quirks) {
+AsmStatement *disassemble(FILE *program_file, size_t *num_statements,
+                          bool has_quirks) {
     unsigned char bytes[SIZE_MEMORY];
     size_t bytes_read = fread(bytes, 1, SIZE_MEMORY, program_file);
     if (bytes_read == 0) {
@@ -282,7 +284,7 @@ AsmStatement *disassemble(FILE *program_file, size_t *num_statements, bool has_q
     memset(is_reachable, false, bytes_read);
     set_is_reachable(is_reachable, bytes, bytes_read, 0);
     int num_reachable = count_reachable(is_reachable, bytes_read);
-    *num_statements = (num_reachable / 2) + (bytes_read - num_reachable) + 1;
+    *num_statements = (num_reachable / 2) + (bytes_read - num_reachable);
     AsmStatement *assembly = malloc(sizeof(AsmStatement) * *num_statements);
     memset(assembly, 0, sizeof(AsmStatement) * *num_statements);
 
@@ -304,7 +306,7 @@ AsmStatement *disassemble(FILE *program_file, size_t *num_statements, bool has_q
         // Set lable
         if (should_put_label(*curr_inst)) {
             unsigned short addr = ADDR(opcode) - 0x200;
-            addr -= count_reachable(is_reachable, MIN(addr, bytes_read) / 2);
+            addr -= count_reachable(is_reachable, MIN(addr, bytes_read)) / 2;
             if (addr >= *num_statements) continue;
             AsmStatement *label_asm_stat = &assembly[addr];
             sprintf(label_asm_stat->label, "L%03X", ADDR(opcode));
