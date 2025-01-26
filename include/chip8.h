@@ -5,12 +5,13 @@
 
 /**
  * Memory layout constants
- * @since 0.1.0
+ * @since 1.2.0
  */
 #define STACK_START 0xee0
 #define STACK_END 0xf00
 #define PROGRAM_START 0x200
 #define START_VIDEO_MEM 0xf00
+#define SIZE_MEMORY (START_VIDEO_MEM + SIZE_VIDEO_MEM)
 
 /**
  * Screen dimention constants
@@ -28,6 +29,22 @@
 #define GET_XY(sig) (sig & 0x00ffff00) >> 8
 #define SET_N(n) (n) << 4
 #define SET_XY(xy) (xy) << 8
+
+/**
+ * Everything that chip8 cares about
+ * @since 1.2.0
+ */
+typedef struct {
+    unsigned char V[16];               /**< Registers from V0 to VF */
+    unsigned short pc;                 /**< Program counter */
+    unsigned char sp;                  /**< Stack pointer */
+    unsigned short I;                  /**< Index register */
+    unsigned char dt, st;              /**< Delay and sound timer */
+    bool hi_res;                       /**< HIgh resolution*/
+    bool has_superchip8_quirks;        /**< SuperChip8 quirks*/
+    unsigned char flags[16];           /**< Flag registers */
+    unsigned char memory[SIZE_MEMORY]; /**< RAM and VRAM */
+} Chip8Context;
 
 /**
  * Flags for IO control
@@ -54,14 +71,6 @@ typedef enum {
  * @since 0.1.0
  */
 int load_program(const char* program_path);
-
-/**
- * Prints registers, program counter, stack pointer, index, video buffer and
- * some memory
- * @see `print_register()` and others in include/debugger.h
- * @since 0.1.0
- */
-void print_state();
 
 /**
  * Initializes the program counter and stack pointer
@@ -125,5 +134,12 @@ void set_superchip8_quirks();
  * @since 0.1.0
  */
 bool get_hi_res();
+
+/**
+ * Gets current Chip8Context
+ * @return Chip8Context
+ * @since 1.2.0
+ */
+Chip8Context* get_chip8();
 
 #endif

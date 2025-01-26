@@ -100,7 +100,7 @@ void update_io(unsigned int sig, bool *keys) {
         case KEYBOARD_NONBLOCKING:
             if (get_debugging() != NO_DEBUGGING) {
                 // TODO: Figure out the best way to display this
-                
+
                 // mvprintw(1, 0, "PLEASE PRESS A KEY");
                 key = get_key(keys, KEYBOARD_BLOCKING);
                 // move(1, 0);
@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
         printf("\e[1;1H\e[2J");
         next_cycle();
         printf("\n");
-        print_state();
+        print_state(get_chip8());
         decrement_timers();
         fgetc(stdin);
     }

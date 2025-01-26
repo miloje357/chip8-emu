@@ -84,6 +84,19 @@ void print_memory(unsigned char *memory, unsigned short pc) {
     }
 }
 
+void print_state(Chip8Context *chip8) {
+    print_registers(chip8->V);
+    printf("\n");
+    print_stack(chip8->memory + STACK_START, STACK_END - STACK_START,
+                chip8->sp);
+    printf("\n");
+    printf("Stack pointer:   %02x\n", chip8->sp);
+    printf("Program counter: %04x\n", chip8->pc);
+    printf("Index register:  %04x\n", chip8->I);
+    printf("\n");
+    print_memory(chip8->memory, chip8->pc);
+}
+
 void set_error(const char *new_err_msg) { err_msg = new_err_msg; }
 
 void print_error() {

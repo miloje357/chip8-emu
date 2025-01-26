@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "chip8.h"
+
 /**
  * All the states of debugging
  * @since 1.2.0
@@ -61,6 +63,15 @@ void print_stack(unsigned char *stack, unsigned char stack_size,
  * @since 0.1.0
  */
 void print_memory(unsigned char *memory, unsigned short pc);
+
+/**
+ * Prints registers, program counter, stack pointer, index, video buffer and
+ * some memory
+ * @see `print_register()`
+ * @param chip8: pointer to a Chip8Context (see get_chip8 in include/chip8.h)
+ * @since 1.2.0
+ */
+void print_state(Chip8Context *chip8);
 
 /**
  * Set the error message to be printed by `print_error()`
