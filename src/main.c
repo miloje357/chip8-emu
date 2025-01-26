@@ -48,6 +48,8 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
         // Beacuase every non-blocking keyboard signal is a blocking one in
         // graphic debugging mode, there must be a way to get the "no key
         // pressed" action
+        // BUG: Means that BLOCKING can return KEYBOARD_UNSET when
+        //      GRAPHIC_DEBUGGING
         if (key == KEYBOARD_UNSET && get_debugging() == GRAPHIC_DEBUGGING)
             return KEYBOARD_UNSET;
         usleep(10);

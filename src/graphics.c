@@ -1,3 +1,6 @@
+/* TODO: 1. Implement an assembly view
+ *       2. Display message when a key must be pressed in debugging mode
+ */
 #include "graphics.h"
 
 #include <locale.h>
@@ -29,6 +32,7 @@
 #define DRAW_BORDER() draw_centered_border(REAL_HEIGHT + 2, REAL_WIDTH + 2)
 
 int game_height, game_width;
+bool is_flash_on;
 
 void draw_border(int y, int x, int h, int w) {
     mvhline(y, x, 0, w);
@@ -119,11 +123,6 @@ void handle_win_size(unsigned char *video_mem, bool hi_res) {
     static int last_win_h, last_win_w;
     set_win_dimens();
     bool is_win_small = last_win_w != game_width || last_win_h != game_height;
-    if (is_win_small) {
-        draw_all(video_mem, hi_res);
-        last_win_w = game_width;
-        last_win_h = game_height;
-    }
     while (game_height < REAL_HEIGHT || game_width < REAL_WIDTH) {
         if (is_win_small) {
             display_small_window_message();
@@ -132,6 +131,11 @@ void handle_win_size(unsigned char *video_mem, bool hi_res) {
         }
         set_win_dimens();
         usleep(0.5 * SECONDS);
+    }
+    if (is_win_small) {
+        draw_all(video_mem, hi_res);
+        last_win_w = game_width;
+        last_win_h = game_height;
     }
 }
 
@@ -183,35 +187,8 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
     refresh();
 }
 
-void draw_all(unsigned char *video_mem, bool hi_res) {
-    clear_screen();
-    // TODO: Implement st_flash
-    for (int num_byte = 0; num_byte < SIZE_VIDEO_MEM; num_byte++) {
-        unsigned char curr_byte = video_mem[num_byte];
-        int x = num_byte % NUM_BYTES_IN_ROW;
-        int y = num_byte / NUM_BYTES_IN_ROW;
-        if (!hi_res && x >= NUM_BYTES_IN_ROW / 2) continue;
-        if (!hi_res && y >= HEIGTH / 2) break;
-        for (int i = 0; i < 8; i++) {
-            if (hi_res) {
-                draw_pixel_hi_res(y, x * 8 + i, (curr_byte >> 7));
-                curr_byte <<= 1;
-                continue;
-            }
-            draw_pixel(y, x * 8 + i, (curr_byte >> 7));
-            curr_byte <<= 1;
-        }
-    }
-}
-
-void st_flash(bool is_pixel_on) {
-    static bool was_pixel_on = false;
-    if (was_pixel_on == is_pixel_on) {
-        return;
-    }
-    was_pixel_on = is_pixel_on;
-
-    char pixel = (is_pixel_on) ? '@' : ' ';
+void flash_screen() {
+    char pixel = (is_flash_on) ? '@' : ' ';
     int flash_h = (game_height - (REAL_HEIGHT + 2)) / 2;
     char *pixels = malloc(game_width + 1);
     memset(pixels, pixel, game_width + 1);
@@ -234,6 +211,35 @@ void st_flash(bool is_pixel_on) {
     free(pixels);
 }
 
+void st_flash(bool is_pixel_on) {
+    if (is_flash_on == is_pixel_on) {
+        return;
+    }
+    is_flash_on = is_pixel_on;
+    flash_screen();
+}
+
+void draw_all(unsigned char *video_mem, bool hi_res) {
+    clear_screen();
+    for (int num_byte = 0; num_byte < SIZE_VIDEO_MEM; num_byte++) {
+        unsigned char curr_byte = video_mem[num_byte];
+        int x = num_byte % NUM_BYTES_IN_ROW;
+        int y = num_byte / NUM_BYTES_IN_ROW;
+        if (!hi_res && x >= NUM_BYTES_IN_ROW / 2) continue;
+        if (!hi_res && y >= HEIGTH / 2) break;
+        for (int i = 0; i < 8; i++) {
+            if (hi_res) {
+                draw_pixel_hi_res(y, x * 8 + i, (curr_byte >> 7));
+                curr_byte <<= 1;
+                continue;
+            }
+            draw_pixel(y, x * 8 + i, (curr_byte >> 7));
+            curr_byte <<= 1;
+        }
+    }
+    // TODO: Redraw assembly view
+    flash_screen();
+}
 unsigned long get_secs() {
     struct timeval tv;
     gettimeofday(&tv, NULL);

@@ -1,4 +1,4 @@
-/* TODO: 1. Implement an assembly view
+/* TODO: 1. Implement assembly buffer
  */
 #include "debugger.h"
 
