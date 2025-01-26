@@ -1,5 +1,3 @@
-/* TODO: 1. Write a chip8-context struct
- */
 #include "chip8.h"
 
 #include <stdbool.h>

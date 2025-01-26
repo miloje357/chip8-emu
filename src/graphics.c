@@ -1,5 +1,3 @@
-/* TODO: 1. Emulation window positioning
- */
 #include "graphics.h"
 
 #include <locale.h>
@@ -152,7 +150,6 @@ void init_graphics() {
 void clear_screen() {
     clear();
     DRAW_BORDER();
-    // BUG: Line dissapears when changing to smaller win size
     mvvline(0, game_width, 0, game_height);
     refresh();
 }
@@ -188,6 +185,7 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
 
 void draw_all(unsigned char *video_mem, bool hi_res) {
     clear_screen();
+    // TODO: Implement st_flash
     for (int num_byte = 0; num_byte < SIZE_VIDEO_MEM; num_byte++) {
         unsigned char curr_byte = video_mem[num_byte];
         int x = num_byte % NUM_BYTES_IN_ROW;

@@ -13,11 +13,12 @@
 #include "graphics.h"
 
 #define DEFAULT_TICK_SPEED 900
+#define SECOND 1000000
 
 unsigned long get_time() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000000 + tv.tv_usec;
+    return tv.tv_sec * SECOND + tv.tv_usec;
 }
 
 unsigned char translate(char key) {
@@ -42,7 +43,14 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
     // KEYBOARD_BLOCKING
     unsigned char key = KEYBOARD_UNSET;
     while (key == KEYBOARD_UNSET) {
+        handle_win_size(get_video_mem(), get_hi_res());
         key = translate(getch());
+        // Beacuase every non-blocking keyboard signal is a blocking one in
+        // graphic debugging mode, there must be a way to get the "no key
+        // pressed" action
+        if (key == KEYBOARD_UNSET && get_debugging() == GRAPHIC_DEBUGGING)
+            return KEYBOARD_UNSET;
+        usleep(10);
     }
     return key;
 }
@@ -62,12 +70,12 @@ void update_timers(bool *keys) {
     unsigned static long cpu_timers;
     unsigned static long keyboard_timer;
     unsigned long now = get_time();
-    if (now - keyboard_timer >= 1000000 / 60) {
+    if (now - keyboard_timer >= SECOND / 60) {
         update_keys(keys);
         keyboard_timer = now;
     }
 
-    if (now - cpu_timers >= 1000000 / 60) {
+    if (now - cpu_timers >= SECOND / 60) {
         Flag timer_flag = decrement_timers();
         st_flash(timer_flag == SOUND);
         cpu_timers = now;
@@ -198,6 +206,7 @@ int main(int argc, char *argv[]) {
     init_graphics();
     bool is_key_pressed[16];
     unsigned int flag = IDLE;
+    int tick_count = 0;
     while (flag != EXIT) {
         handle_win_size(get_video_mem(), get_hi_res());
 
@@ -206,9 +215,20 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < 3; i++) {
                 flag = next_cycle();
             }
+            tick_count++;
             update_io(flag, is_key_pressed);
-            // TODO: Implement update_timers()
-            while (getch() == ERR) usleep(1000);
+
+            // Update timers per tick
+            if (tick_count >= SECOND / 60 / tick_speed) {
+                flag = decrement_timers();
+                st_flash(flag == SOUND);
+                tick_count = 0;
+            }
+
+            while (getch() != '\n') {
+                handle_win_size(get_video_mem(), get_hi_res());
+                usleep(tick_speed);
+            }
             continue;
         }
 

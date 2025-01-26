@@ -32,7 +32,7 @@ void debug_printf(const char *format, ...) {
             va_start(args, format);
             vasprintf(&str, format, args);
             va_end(args);
-            mvprintw(0, 0, "%s", str);
+            mvprintw(0, 133, "%s", str);
             */
             return;
         case CONSOLE_DEBUGGING:
