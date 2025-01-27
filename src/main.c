@@ -229,6 +229,7 @@ int main(int argc, char *argv[]) {
         handle_win_size(get_video_mem(), get_hi_res());
 
         if (get_debugging() == GRAPHIC_DEBUGGING) {
+            set_curr_inst(get_chip8()->pc);
             // Run the whole fetch-decode-execute cycle
             for (int i = 0; i < 3; i++) {
                 flag = next_cycle();

@@ -1,5 +1,6 @@
-/* TODO: 1. Implement an assembly view
- *       2. Display message when a key must be pressed in debugging mode
+/* TODO: 1. Add "syntax highlighting" to assembly
+ *       2. Add scrolling
+ *       3. Display message when a key must be pressed in debugging mode
  */
 #include "debugger.h"
 
@@ -17,6 +18,12 @@
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
+#define REDRAW 0
+typedef enum {
+    NOT_SELECTED,
+    SELECTED,
+} Color;
+
 #define DRAW_LINE() mvvline(d_starty, d_startx, 0, d_height)
 
 const char *err_msg = NULL;
@@ -25,6 +32,7 @@ DebugType debug_state = NO_DEBUGGING;
 AsmStatement *assembly;
 size_t num_statements;
 int d_startx, d_starty, d_width, d_height;
+unsigned short last_pc;
 
 void set_debugging(DebugType type) { debug_state = type; }
 
@@ -123,7 +131,7 @@ void set_debug_dimes(int y, int x, int h, int w) {
     d_width = w;
 }
 
-int draw_statement(int row, AsmStatement stat) {
+int draw_statement(int row, AsmStatement stat, bool is_selected) {
     int x = d_startx + 1;
     move(row, x);
     if (stat.is_directive) {
@@ -139,6 +147,7 @@ int draw_statement(int row, AsmStatement stat) {
         row += 2;
         move(row, x);
     }
+    if (is_selected) attron(COLOR_PAIR(SELECTED));
     printw("\t%s", stat.name);
     for (int i = 0; i < stat.num_args - 1; i++) {
         printw(" %s,", stat.args[i]);
@@ -146,25 +155,54 @@ int draw_statement(int row, AsmStatement stat) {
     if (stat.num_args != 0) {
         printw(" %s", stat.args[stat.num_args - 1]);
     }
+    if (is_selected) attroff(COLOR_PAIR(SELECTED));
     row++;
-    return row;
     refresh();
+    return row;
 }
 
-void draw_assembly() {
+void set_curr_inst(unsigned short pc) {
     int row = d_starty;
+    int addr = 0x200;
     for (int i = 0; i < num_statements && row < d_height - d_starty; i++) {
-        row = draw_statement(row, assembly[i]);
+        if (addr == pc || addr == last_pc) {
+            // deselects instruction when addr == last_pc
+            draw_statement(row, assembly[i], addr == pc);
+        }
+        row++;
+        if (assembly[i].is_directive) {
+            addr++;
+            continue;
+        }
+        addr += 2;
+        if (strlen(assembly[i].label) != 0) row += 2;
+    }
+    last_pc = pc;
+}
+
+void draw_assembly(unsigned short pc) {
+    if (pc == REDRAW) pc = last_pc;
+    else last_pc = pc;
+    int row = d_starty;
+    int addr = 0x200;
+
+    for (int i = 0; i < num_statements && row < d_height - d_starty; i++) {
+        row = draw_statement(row, assembly[i], addr == pc);
+        if (assembly[i].is_directive) addr++;
+        else addr += 2;
     }
 }
 
 void init_debug_graphics() {
-    DRAW_LINE();
-    draw_assembly();
+    start_color();
+    init_pair(NOT_SELECTED, COLOR_WHITE, COLOR_BLACK);
+    init_pair(SELECTED, COLOR_BLACK, COLOR_WHITE);
+    clear_area(d_starty, d_startx + 1, d_height, d_width);
+    draw_assembly(PROGRAM_START);
 }
 
 void redraw_debug() {
-    clear_area(d_starty, d_startx, d_height, d_width);
+    clear_area(d_starty, d_startx + 1, d_height, d_width);
+    draw_assembly(REDRAW);
     DRAW_LINE();
-    draw_assembly();
 }

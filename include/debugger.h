@@ -98,4 +98,11 @@ void set_assembly(FILE *src, bool has_quirks);
  */
 void free_assembly();
 
+/**
+ * Selects the current instruction in assembly view
+ * @param pc: the program counter
+ * @since 1.2.0
+ */
+void set_curr_inst(unsigned short pc);
+
 #endif
