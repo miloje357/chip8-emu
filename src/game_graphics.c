@@ -1,9 +1,5 @@
-/* TODO: 1. Implement an assembly view
- *       2. Display message when a key must be pressed in debugging mode
- */
-#include "graphics.h"
+#include "game_graphics.h"
 
-#include <locale.h>
 #include <ncurses.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -13,51 +9,48 @@
 #include <unistd.h>
 
 #include "chip8.h"
-#include "debugger.h"
+#include "tui.h"
 
 #define SECONDS 1000000
 
 #define XSET_MESSAGE "Please run 'xset r rate 100' for better keyboard input"
 #define XSET_MESSAGE_TIME 10
-#define SMALL_WINDOW_MESSAGE "Please resize the window"
-
-#define DEBUG_RATIO 0.8
 
 #define PIXEL_ON "██"
 #define PIXEL_OFF "  "
 
-#define REAL_WIDTH 128
-#define REAL_HEIGHT 32
 #define NUM_BYTES_IN_ROW (SIZE_VIDEO_MEM / HEIGTH)
-#define DRAW_BORDER() draw_centered_border(REAL_HEIGHT + 2, REAL_WIDTH + 2)
+#define DRAW_BORDER() draw_centered_border(GAME_HEIGHT + 2, GAME_WIDTH + 2)
 
 int game_height, game_width;
 bool is_flash_on;
 
-void draw_border(int y, int x, int h, int w) {
-    mvhline(y, x, 0, w);
-    mvhline(y + h, x, 0, w);
-    mvvline(y, x, 0, h);
-    mvvline(y, x + w, 0, h);
-    mvaddch(y, x, ACS_ULCORNER);
-    mvaddch(y + h, x, ACS_LLCORNER);
-    mvaddch(y, x + w, ACS_URCORNER);
-    mvaddch(y + h, x + w, ACS_LRCORNER);
+void set_game_dimens(int h, int w) {
+    game_height = h;
+    game_width = w;
 }
 
 void draw_centered_border(int h, int w) {
     draw_border((game_height - h) / 2, (game_width - w) / 2, h - 1, w - 1);
 }
 
+void init_game_graphics() { DRAW_BORDER(); }
+
+void clear_game() {
+    clear_area(0, 0, game_height, game_width);
+    DRAW_BORDER();
+    refresh();
+}
+
 void draw_pixel(int y, int x, bool is_on) {
     const char *pixel = (is_on) ? PIXEL_ON : PIXEL_OFF;
-    mvaddstr((game_height - REAL_HEIGHT) / 2 + y,
-             (game_width - REAL_WIDTH) / 2 + x * 2, pixel);
+    mvaddstr((game_height - GAME_HEIGHT) / 2 + y,
+             (game_width - GAME_WIDTH) / 2 + x * 2, pixel);
 }
 
 void draw_pixel_hi_res(int y, int x, bool is_on) {
-    int start_x = (game_width - REAL_WIDTH) / 2;
-    int start_y = (game_height - REAL_HEIGHT) / 2;
+    int start_x = (game_width - GAME_WIDTH) / 2;
+    int start_y = (game_height - GAME_HEIGHT) / 2;
     unsigned short codepoint = mvinch(start_y + y / 2, start_x + x);
 
     /* utf8 encoded block element characters
@@ -100,64 +93,6 @@ void draw_pixel_hi_res(int y, int x, bool is_on) {
     mvaddstr(start_y + y / 2, start_x + x, pixel);
 }
 
-void display_small_window_message() {
-    clear();
-    draw_centered_border(3, strlen(SMALL_WINDOW_MESSAGE) + 2);
-    mvaddstr((game_height - 1) / 2,
-             (game_width - strlen(SMALL_WINDOW_MESSAGE)) / 2,
-             SMALL_WINDOW_MESSAGE);
-    refresh();
-}
-
-void set_win_dimens() {
-    struct winsize ws;
-    ioctl(0, TIOCGWINSZ, &ws);
-    game_width = ws.ws_col;
-    if (get_debugging() == GRAPHIC_DEBUGGING) {
-        game_width *= DEBUG_RATIO;
-    }
-    game_height = ws.ws_row;
-}
-
-void handle_win_size(unsigned char *video_mem, bool hi_res) {
-    static int last_win_h, last_win_w;
-    set_win_dimens();
-    bool is_win_small = last_win_w != game_width || last_win_h != game_height;
-    while (game_height < REAL_HEIGHT || game_width < REAL_WIDTH) {
-        if (is_win_small) {
-            display_small_window_message();
-            last_win_w = game_width;
-            last_win_h = game_height;
-        }
-        set_win_dimens();
-        usleep(0.5 * SECONDS);
-    }
-    if (is_win_small) {
-        draw_all(video_mem, hi_res);
-        last_win_w = game_width;
-        last_win_h = game_height;
-    }
-}
-
-void init_graphics() {
-    setlocale(LC_CTYPE, "");
-    initscr();
-    cbreak();
-    noecho();
-    nodelay(stdscr, true);
-    curs_set(0);
-    set_win_dimens();
-    DRAW_BORDER();
-    refresh();
-}
-
-void clear_screen() {
-    clear();
-    DRAW_BORDER();
-    mvvline(0, game_width, 0, game_height);
-    refresh();
-}
-
 void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
     unsigned short xy = GET_XY(video_signal);
     unsigned char n = GET_N(video_signal);
@@ -189,23 +124,23 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
 
 void flash_screen() {
     char pixel = (is_flash_on) ? '@' : ' ';
-    int flash_h = (game_height - (REAL_HEIGHT + 2)) / 2;
+    int flash_h = (game_height - (GAME_HEIGHT + 2)) / 2;
     char *pixels = malloc(game_width + 1);
     memset(pixels, pixel, game_width + 1);
     pixels[game_width] = '\0';
     for (int i = 0; i < flash_h; i++) {
         mvaddstr(i, 0, pixels);
-        mvaddstr((game_height + REAL_HEIGHT) / 2 + 1 + i, 0, pixels);
+        mvaddstr((game_height + GAME_HEIGHT) / 2 + 1 + i, 0, pixels);
     }
     free(pixels);
 
-    int flash_w = (game_width - REAL_WIDTH) / 2;
+    int flash_w = (game_width - GAME_WIDTH) / 2;
     pixels = malloc(flash_w);
     memset(pixels, pixel, flash_w - 1);
     pixels[flash_w - 1] = '\0';
-    for (int i = 0; i <= REAL_HEIGHT + 1; i++) {
+    for (int i = 0; i <= GAME_HEIGHT + 1; i++) {
         mvaddstr(flash_h + i, 0, pixels);
-        mvaddstr(flash_h + i, (game_width + REAL_WIDTH) / 2 + 1, pixels);
+        mvaddstr(flash_h + i, (game_width + GAME_WIDTH) / 2 + 1, pixels);
     }
     refresh();
     free(pixels);
@@ -219,8 +154,8 @@ void st_flash(bool is_pixel_on) {
     flash_screen();
 }
 
-void draw_all(unsigned char *video_mem, bool hi_res) {
-    clear_screen();
+void redraw_game(unsigned char *video_mem, bool hi_res) {
+    clear_game();
     for (int num_byte = 0; num_byte < SIZE_VIDEO_MEM; num_byte++) {
         unsigned char curr_byte = video_mem[num_byte];
         int x = num_byte % NUM_BYTES_IN_ROW;
@@ -237,9 +172,9 @@ void draw_all(unsigned char *video_mem, bool hi_res) {
             curr_byte <<= 1;
         }
     }
-    // TODO: Redraw assembly view
     flash_screen();
 }
+
 unsigned long get_secs() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -247,7 +182,7 @@ unsigned long get_secs() {
 }
 
 void display_xset_message() {
-    int y = (game_height - REAL_HEIGHT) / 4;
+    int y = (game_height - GAME_HEIGHT) / 4;
     int x = (game_width - strlen(XSET_MESSAGE)) / 2;
     draw_border(y - 1, x - 1, 2, strlen(XSET_MESSAGE) + 1);
     mvaddstr(y, x, XSET_MESSAGE);
@@ -255,11 +190,10 @@ void display_xset_message() {
 }
 
 void clear_xset_message() {
-    int y = (game_height - REAL_HEIGHT) / 4 - 1;
+    int y = (game_height - GAME_HEIGHT) / 4 - 1;
     int x = (game_width - strlen(XSET_MESSAGE)) / 2 - 1;
     for (int i = 0; i < 3; i++) {
         move(y + i, x);
-        // TODO: Delete to the assembly view
         clrtoeol();
     }
 }

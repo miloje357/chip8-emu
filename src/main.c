@@ -10,7 +10,8 @@
 
 #include "chip8.h"
 #include "debugger.h"
-#include "graphics.h"
+#include "game_graphics.h"
+#include "tui.h"
 
 #define DEFAULT_TICK_SPEED 900
 #define SECOND 1000000
@@ -50,6 +51,7 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
         // pressed" action
         // BUG: Means that BLOCKING can return KEYBOARD_UNSET when
         //      GRAPHIC_DEBUGGING
+        // BUG: Doesn't work
         if (key == KEYBOARD_UNSET && get_debugging() == GRAPHIC_DEBUGGING)
             return KEYBOARD_UNSET;
         usleep(10);
@@ -95,11 +97,11 @@ void update_io(unsigned int sig, bool *keys) {
             break;
 
         case CLEAR:
-            clear_screen();
+            clear_game();
             break;
 
         case SCROLL:
-            draw_all(get_video_mem(), get_hi_res());
+            redraw_game(get_video_mem(), get_hi_res());
             break;
 
         case KEYBOARD_BLOCKING:
@@ -205,7 +207,7 @@ int main(int argc, char *argv[]) {
         fgetc(stdin);
     }
 
-    init_graphics();
+    init_graphics(get_debugging() == GRAPHIC_DEBUGGING);
     bool is_key_pressed[16];
     unsigned int flag = IDLE;
     int tick_count = 0;

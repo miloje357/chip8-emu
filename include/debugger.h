@@ -40,31 +40,6 @@ void debug_printf(const char *format_string, ...)
     __attribute__((format(printf, 1, 2)));
 
 /**
- * Prints the state of registers
- * @param regs: registers to print
- * @since 0.1.0
- */
-void print_registers(unsigned char *regs);
-
-/**
- * Prints the state of the stack
- * @param stack: start pointer of the stack
- * @param stack_size: size of the stack
- * @param sp: the stack pointer
- * @since 0.1.0
- */
-void print_stack(unsigned char *stack, unsigned char stack_size,
-                 unsigned char sp);
-
-/**
- * Prints the state of the memory
- * @param memory: pointer to the chip8 RAM
- * @param pc: the program counter
- * @since 0.1.0
- */
-void print_memory(unsigned char *memory, unsigned short pc);
-
-/**
  * Prints registers, program counter, stack pointer, index, video buffer and
  * some memory
  * @see `print_register()`
@@ -85,5 +60,27 @@ void set_error(const char *new_err_msg);
  * @since 0.1.0
  */
 void print_error();
+
+/**
+ * Set the geometry of the debugger
+ * @param y: y coordinate of the origin of the debugger
+ * @param x: x coordinate of the origin of the debugger
+ * @param h: height of the debugger
+ * @param w: width of the debugger
+ * @since 1.2.0
+ */
+void set_debug_dimes(int y, int x, int h, int w);
+
+/**
+ * Initialize the debugger graphics (draw the seperator)
+ * @since 1.2.0
+ */
+void init_debug_graphics();
+
+/**
+ * Redraw the debugger
+ * @since 1.2.0
+ */
+void redraw_debug();
 
 #endif

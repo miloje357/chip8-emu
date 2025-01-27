@@ -1,26 +1,34 @@
 /* TODO: 1. Implement assembly buffer
+ *       2. Implement an assembly view
+ *       3. Display message when a key must be pressed in debugging mode
  */
 #include "debugger.h"
 
-// #include <ncurses.h>
+#include <ncurses.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 
 #include "chip8.h"
+#include "tui.h"
 
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
+#define DRAW_LINE() mvvline(d_starty, d_startx, 0, d_height)
+
 const char *err_msg = NULL;
+// NOTE: Should delete before merge
+char *curr_msg;
 DebugType debug_state = NO_DEBUGGING;
+
+int d_startx, d_starty, d_width, d_height;
 
 void set_debugging(DebugType type) { debug_state = type; }
 
 DebugType get_debugging() { return debug_state; }
 
 void debug_printf(const char *format, ...) {
-    // char *str;
     va_list args;
 
     switch (debug_state) {
@@ -28,12 +36,11 @@ void debug_printf(const char *format, ...) {
             return;
         case GRAPHIC_DEBUGGING:
             // NOTE: Should delete before merge
-            /*
             va_start(args, format);
-            vasprintf(&str, format, args);
+            vasprintf(&curr_msg, format, args);
             va_end(args);
-            mvprintw(0, 133, "%s", str);
-            */
+            mvaddstr(d_starty, d_startx + 1, curr_msg);
+            refresh();
             return;
         case CONSOLE_DEBUGGING:
             va_start(args, format);
@@ -102,4 +109,20 @@ void set_error(const char *new_err_msg) { err_msg = new_err_msg; }
 void print_error() {
     if (err_msg == NULL) return;
     printf("[CRASH] %s\n", err_msg);
+}
+
+void set_debug_dimes(int y, int x, int h, int w) {
+    d_starty = y;
+    d_startx = x;
+    d_height = h;
+    d_width = w;
+}
+
+void init_debug_graphics() { DRAW_LINE(); }
+
+void redraw_debug() {
+    clear_area(d_starty, d_startx, d_height, d_width);
+    DRAW_LINE();
+    // NOTE: Should delete before merge
+    mvaddstr(d_starty, d_startx + 1, curr_msg);
 }

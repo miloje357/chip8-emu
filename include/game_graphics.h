@@ -1,13 +1,28 @@
-#ifndef GRAPHICS_H_
-#define GRAPHICS_H_
+#ifndef GAME_GRAPHICS_H_
+#define GAME_GRAPHICS_H_
 
 #include <stdbool.h>
 
 /**
- * Runs all the ncurses initialization routines
- * @since 0.1.0
+ * The dimentions of the game window
+ * @since 1.2.0
  */
-void init_graphics();
+#define GAME_WIDTH 128
+#define GAME_HEIGHT 32
+
+/**
+ * Set the dimentions of the video display
+ * @param h: height
+ * @param w: width
+ * @since 1.2.0
+ */
+void set_game_dimens(int h, int w);
+
+/**
+ * Initialize the game graphics (draw the border)
+ * @since 1.2.0
+ */
+void init_game_graphics();
 
 /**
  * Draws the changed part of the video buffer
@@ -24,9 +39,9 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res);
 
 /**
  * Clears the video display
- * @since 0.1.0
+ * @since 1.2.0
  */
-void clear_screen();
+void clear_game();
 
 /**
  * Sets the outer parts on or off
@@ -47,14 +62,6 @@ void handle_xset_message();
  * @param hi_res: is the high resolution mode on
  * @since 0.1.0
  */
-void draw_all(unsigned char *video_mem, bool hi_res);
-
-/**
- * Displays a message if the screen is too small
- * @param video_mem: chip8 video buffer (used for redrawing)
- * @param hi_res: is the high resolution mode on (used for redrawing)
- * @since 0.1.0
- */
-void handle_win_size(unsigned char *video_mem, bool hi_res);
+void redraw_game(unsigned char *video_mem, bool hi_res);
 
 #endif
