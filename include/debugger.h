@@ -2,6 +2,7 @@
 #define DEBUGGER_H_
 
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "chip8.h"
 
@@ -82,5 +83,19 @@ void init_debug_graphics();
  * @since 1.2.0
  */
 void redraw_debug();
+
+/**
+ * Disassembles the current program and loads it to memory
+ * @param src: The source program
+ * @param has_quirks: true if the emulator runs with Super Chip8 quirks
+ * @since 1.2.0
+ */
+void set_assembly(FILE *src, bool has_quirks);
+
+/**
+ * Frees the assembly memory
+ * @since 1.2.0
+ */
+void free_assembly();
 
 #endif

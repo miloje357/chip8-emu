@@ -6,10 +6,12 @@ chip8_emu_SOURCES = \
 	src/debugger.c\
 	src/game_graphics.c\
 	src/tui.c\
+	src/dasm.c\
 	include/chip8.h\
 	include/debugger.h\
 	include/game_graphics.h\
-	include/tui.h
+	include/tui.h\
+	include/dasm.h
 chip8_emu_CFLAGS = -g -Wall -Werror -O3\
 		    -I$(top_srcdir)/include\
 		    -lncurses

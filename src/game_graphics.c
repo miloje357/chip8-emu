@@ -7,6 +7,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "chip8.h"
 #include "tui.h"
@@ -123,27 +124,32 @@ void draw(unsigned char *video_mem, unsigned int video_signal, bool hi_res) {
 }
 
 void flash_screen() {
+    char *pixels;
     char pixel = (is_flash_on) ? '@' : ' ';
     int flash_h = (game_height - (GAME_HEIGHT + 2)) / 2;
-    char *pixels = malloc(game_width + 1);
-    memset(pixels, pixel, game_width + 1);
-    pixels[game_width] = '\0';
-    for (int i = 0; i < flash_h; i++) {
-        mvaddstr(i, 0, pixels);
-        mvaddstr((game_height + GAME_HEIGHT) / 2 + 1 + i, 0, pixels);
+    if (flash_h > 0) {
+        char *pixels = malloc(game_width + 1);
+        memset(pixels, pixel, game_width + 1);
+        pixels[game_width] = '\0';
+        for (int i = 0; i < flash_h; i++) {
+            mvaddstr(i, 0, pixels);
+            mvaddstr((game_height + GAME_HEIGHT) / 2 + 1 + i, 0, pixels);
+        }
+        free(pixels);
     }
-    free(pixels);
 
     int flash_w = (game_width - GAME_WIDTH) / 2;
-    pixels = malloc(flash_w);
-    memset(pixels, pixel, flash_w - 1);
-    pixels[flash_w - 1] = '\0';
-    for (int i = 0; i <= GAME_HEIGHT + 1; i++) {
-        mvaddstr(flash_h + i, 0, pixels);
-        mvaddstr(flash_h + i, (game_width + GAME_WIDTH) / 2 + 1, pixels);
+    if (flash_w > 0) {
+        pixels = malloc(flash_w);
+        memset(pixels, pixel, flash_w - 1);
+        pixels[flash_w - 1] = '\0';
+        for (int i = 0; i <= GAME_HEIGHT + 1; i++) {
+            mvaddstr(flash_h + i, 0, pixels);
+            mvaddstr(flash_h + i, (game_width + GAME_WIDTH) / 2 + 1, pixels);
+        }
+        refresh();
+        free(pixels);
     }
-    refresh();
-    free(pixels);
 }
 
 void st_flash(bool is_pixel_on) {

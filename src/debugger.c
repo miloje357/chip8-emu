@@ -1,6 +1,5 @@
-/* TODO: 1. Implement assembly buffer
- *       2. Implement an assembly view
- *       3. Display message when a key must be pressed in debugging mode
+/* TODO: 1. Implement an assembly view
+ *       2. Display message when a key must be pressed in debugging mode
  */
 #include "debugger.h"
 
@@ -8,8 +7,11 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "chip8.h"
+#include "dasm.h"
 #include "tui.h"
 
 #define ANSI_COLOR_RED "\x1b[31m"
@@ -18,10 +20,10 @@
 #define DRAW_LINE() mvvline(d_starty, d_startx, 0, d_height)
 
 const char *err_msg = NULL;
-// NOTE: Should delete before merge
-char *curr_msg;
 DebugType debug_state = NO_DEBUGGING;
 
+AsmStatement *assembly;
+size_t num_statements;
 int d_startx, d_starty, d_width, d_height;
 
 void set_debugging(DebugType type) { debug_state = type; }
@@ -33,14 +35,7 @@ void debug_printf(const char *format, ...) {
 
     switch (debug_state) {
         case NO_DEBUGGING:
-            return;
         case GRAPHIC_DEBUGGING:
-            // NOTE: Should delete before merge
-            va_start(args, format);
-            vasprintf(&curr_msg, format, args);
-            va_end(args);
-            mvaddstr(d_starty, d_startx + 1, curr_msg);
-            refresh();
             return;
         case CONSOLE_DEBUGGING:
             va_start(args, format);
@@ -106,9 +101,19 @@ void print_state(Chip8Context *chip8) {
 
 void set_error(const char *new_err_msg) { err_msg = new_err_msg; }
 
+// TODO: Rewrite with GRAPHIC_DEBUGGING
 void print_error() {
     if (err_msg == NULL) return;
     printf("[CRASH] %s\n", err_msg);
+}
+
+void set_assembly(FILE *src, bool has_quirks) {
+    assembly = disassemble(src, &num_statements, has_quirks);
+}
+
+void free_assembly() {
+    if (assembly == NULL) return;
+    free(assembly);
 }
 
 void set_debug_dimes(int y, int x, int h, int w) {
@@ -118,11 +123,48 @@ void set_debug_dimes(int y, int x, int h, int w) {
     d_width = w;
 }
 
-void init_debug_graphics() { DRAW_LINE(); }
+int draw_statement(int row, AsmStatement stat) {
+    int x = d_startx + 1;
+    move(row, x);
+    if (stat.is_directive) {
+        printw("%s: %s %s", stat.label, stat.name, stat.args[0]);
+        for (int i = 1; i < stat.num_args; i++) {
+            printw(" %s", stat.args[i]);
+        }
+        row++;
+        return row;
+    }
+    if (strlen(stat.label) != 0) {
+        mvprintw(row + 1, x, "%s:", stat.label);
+        row += 2;
+        move(row, x);
+    }
+    printw("\t%s", stat.name);
+    for (int i = 0; i < stat.num_args - 1; i++) {
+        printw(" %s,", stat.args[i]);
+    }
+    if (stat.num_args != 0) {
+        printw(" %s", stat.args[stat.num_args - 1]);
+    }
+    row++;
+    return row;
+    refresh();
+}
+
+void draw_assembly() {
+    int row = d_starty;
+    for (int i = 0; i < num_statements && row < d_height - d_starty; i++) {
+        row = draw_statement(row, assembly[i]);
+    }
+}
+
+void init_debug_graphics() {
+    DRAW_LINE();
+    draw_assembly();
+}
 
 void redraw_debug() {
     clear_area(d_starty, d_startx, d_height, d_width);
     DRAW_LINE();
-    // NOTE: Should delete before merge
-    mvaddstr(d_starty, d_startx + 1, curr_msg);
+    draw_assembly();
 }

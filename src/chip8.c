@@ -95,13 +95,7 @@ void load_key(unsigned char reg, unsigned char key) {
     }
 }
 
-int load_program(const char *program_path) {
-    FILE *program = fopen(program_path, "r");
-    if (program == NULL) {
-        printf("Error loading %s.\n", program_path);
-        return 1;
-    }
-
+int load_program(FILE *program) {
     fseek(program, 0, SEEK_END);
     int filesize = ftell(program);
     if (filesize == -1) {
@@ -123,9 +117,7 @@ int load_program(const char *program_path) {
         fclose(program);
         return 1;
     }
-
-    fclose(program);
-    debug_printf("Loaded %s\n", program_path);
+    fseek(program, 0, SEEK_SET);
     return 0;
 }
 

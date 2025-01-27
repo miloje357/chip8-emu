@@ -141,11 +141,13 @@ void print_help() {
 void program_exit() {
     endwin();
     print_error();
+    free_assembly();
 }
 
 int main(int argc, char *argv[]) {
     int status;
     int tick_speed = DEFAULT_TICK_SPEED;
+    bool has_quirks = false;
     signal(SIGTERM, program_exit);
 
     char option;
@@ -158,6 +160,7 @@ int main(int argc, char *argv[]) {
                 set_debugging(CONSOLE_DEBUGGING);
                 break;
             case 's':
+                has_quirks = true;
                 set_superchip8_quirks();
                 break;
             case 't':
@@ -190,12 +193,23 @@ int main(int argc, char *argv[]) {
     // For RND instruction
     srand(time(NULL));
 
+    FILE *program = fopen(program_path, "r");
+    if (program == NULL) {
+        printf("Error loading %s.\n", program_path);
+        return 1;
+    }
+
     init_chip8();
-    status = load_program(program_path);
+    status = load_program(program);
     if (status == 1) {
         printf("Exiting...\n");
         return 1;
     }
+
+    if (get_debugging() == GRAPHIC_DEBUGGING) {
+        set_assembly(program, has_quirks);
+    }
+    fclose(program);
 
     while (get_debugging() == CONSOLE_DEBUGGING) {
         // clear screen

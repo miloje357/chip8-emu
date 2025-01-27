@@ -2,6 +2,7 @@
 #define CHIP8_H_
 
 #include <stdbool.h>
+#include <stdio.h>
 
 /**
  * Memory layout constants
@@ -66,11 +67,11 @@ typedef enum {
 
 /**
  * Loads program to memory
- * @param program_path Path of the program
+ * @param program: FILE handle of the program 
  * @return 0 if everything is ok, 1 otherwise
- * @since 0.1.0
+ * @since 1.2.0
  */
-int load_program(const char* program_path);
+int load_program(FILE *program_path);
 
 /**
  * Initializes the program counter and stack pointer
