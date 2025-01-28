@@ -33,7 +33,7 @@ AsmStatement *assembly;
 size_t num_statements;
 int d_startx, d_starty, d_width, d_height;
 unsigned short last_pc;
-int first_inst_index = 0;
+unsigned int first_inst_index = 0;
 
 void set_debugging(DebugType type) { debug_state = type; }
 
@@ -209,12 +209,18 @@ void set_curr_inst(unsigned short pc) {
         // row to be selected is out of bounds
         if ((row >= d_height - d_starty || i < first_inst_index) &&
             addr == pc) {
-            // NOTE: Works for now, but probably better to implement this:
-            // if the first label is closer than half of height,
-            // first_inst_index = first_label else selected row in the middle
+            row = 0;
             first_inst_index = addr_to_index(addr);
             // skip to first label
-            while (strlen(assembly[--first_inst_index].label) == 0);
+            while (strlen(assembly[first_inst_index--].label) == 0) {
+                row++;
+            }
+            // Scroll by one to hide an unwanted instruction
+            first_inst_index++;
+            // if the label is too far, scroll to the current instruction
+            if (row >= d_height - d_starty - 5) {
+                first_inst_index = addr_to_index(addr) - 3;
+            }
             last_pc = pc;
             draw_assembly();
             return;
