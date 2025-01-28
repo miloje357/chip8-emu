@@ -26,6 +26,7 @@
 #define N_ARG "N_ARG"
 #define ADDR_ARG "ADDR_ARG"
 #define IMM_ARG "IMM_ARG"
+#define NIL "NIL"
 
 #define ZERO_ARG_INST(inst, inst_name) strcpy(inst->name, inst_name)
 #define ONE_ARG_INST(inst, opcode, inst_name, arg1) \
@@ -70,6 +71,10 @@ void append_arg(AsmStatement *inst, const char *arg, unsigned short opcode) {
         sprintf(dest, "%d", IMMEDIATE(opcode));
         return;
     }
+    if (strcmp(arg, NIL) == 0) {
+        sprintf(dest, "%04X", opcode);
+        return;
+    }
     strcpy(dest, arg);
 }
 
@@ -78,7 +83,10 @@ void decode_zero(AsmStatement *inst, unsigned short opcode) {
         [0xe0] = "CLS",  [0xee] = "RET", [0xfb] = "SCR", [0xfc] = "SCL",
         [0xfd] = "EXIT", [0xfe] = "LOW", [0xff] = "HIGH"};
     const char *inst_name = inst_names[FIRST_HALF(opcode)];
-    if (inst_name == NULL) return;
+    if (inst_name == NULL) {
+        ONE_ARG_INST(inst, opcode, "NIL", NIL);
+        return;
+    }
     // All 0xxx instructions have no arguments and are of the form 00xx
     ZERO_ARG_INST(inst, inst_name);
 }
@@ -87,7 +95,10 @@ void decode_eight(AsmStatement *inst, unsigned short opcode) {
     static const char *inst_names[0x10] = {
         "LD", "OR", "AND", "XOR", "ADD", "SUB", "SHR", "SUBN", [0xe] = "SHL"};
     const char *inst_name = inst_names[FIRST(opcode)];
-    if (inst_name == NULL) return;
+    if (inst_name == NULL) {
+        ONE_ARG_INST(inst, opcode, "NIL", NIL);
+        return;
+    }
     // All 8xxx instructions have two registers as arguments
     TWO_ARG_INST(inst, opcode, inst_name, VX_ARG, VY_ARG);
 }
@@ -99,6 +110,9 @@ void decode_e(AsmStatement *inst, unsigned short opcode) {
             break;
         case 0xa1:
             ONE_ARG_INST(inst, opcode, "SKNP", VX_ARG);
+            break;
+        default:
+            ONE_ARG_INST(inst, opcode, "NIL", NIL);
             break;
     }
 }
@@ -115,7 +129,10 @@ void decode_f(AsmStatement *inst, unsigned short opcode) {
     }
 
     const char *arg = inst_args[FIRST_HALF(opcode)];
-    if (arg == NULL) return;
+    if (arg == NULL) {
+        ONE_ARG_INST(inst, opcode, "NIL", NIL);
+        return;
+    }
 
     switch (FIRST_HALF(opcode)) {
         case 0x07:
