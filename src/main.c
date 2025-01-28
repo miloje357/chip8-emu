@@ -45,15 +45,13 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
     unsigned char key = KEYBOARD_UNSET;
     while (key == KEYBOARD_UNSET) {
         handle_win_size(get_video_mem(), get_hi_res());
-        key = translate(getch());
+        key = getch();
+        if (key == '\n' && get_debugging() == GRAPHIC_DEBUGGING)
+            return KEYBOARD_UNSET;
+        key = translate(key);
         // Beacuase every non-blocking keyboard signal is a blocking one in
         // graphic debugging mode, there must be a way to get the "no key
         // pressed" action
-        // BUG: Means that BLOCKING can return KEYBOARD_UNSET when
-        //      GRAPHIC_DEBUGGING
-        // BUG: Doesn't work
-        if (key == KEYBOARD_UNSET && get_debugging() == GRAPHIC_DEBUGGING)
-            return KEYBOARD_UNSET;
         usleep(10);
     }
     return key;
