@@ -33,6 +33,7 @@ AsmStatement *assembly;
 size_t num_statements;
 int d_startx, d_starty, d_width, d_height;
 unsigned short last_pc;
+int first_inst_index = 0;
 
 void set_debugging(DebugType type) { debug_state = type; }
 
@@ -161,48 +162,89 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
     return row;
 }
 
+int index_to_addr(int index) {
+    int addr = 0x200;
+    for (int i = 0; i < index; i++) {
+        if (assembly[i].is_directive)
+            addr += assembly[i].num_args;
+        else
+            addr += 2;
+    }
+    return addr;
+}
+
+int addr_to_index(int target) {
+    int addr = 0x200;
+    for (int i = 0; i < num_statements; i++) {
+        if (addr == target) return i;
+        if (assembly[i].is_directive)
+            addr += assembly[i].num_args;
+        else
+            addr += 2;
+    }
+    return -1;
+}
+
+// TODO: Optimize with a lookup table
+void draw_assembly() {
+    int row = d_starty;
+    // addr must start at the address of the first displayed statement
+    int addr = index_to_addr(first_inst_index);
+
+    clear_area(d_starty, d_startx + 1, d_height, d_width);
+    for (int i = first_inst_index;
+         i < num_statements && row < d_height - d_starty; i++) {
+        row = draw_statement(row, assembly[i], addr == last_pc);
+        if (assembly[i].is_directive)
+            addr += assembly[i].num_args;
+        else
+            addr += 2;
+    }
+}
+
 void set_curr_inst(unsigned short pc) {
     int row = d_starty;
     int addr = 0x200;
-    for (int i = 0; i < num_statements && row < d_height - d_starty; i++) {
+    for (int i = 0; i < num_statements; i++) {
+        // row to be selected is out of bounds
+        if ((row >= d_height - d_starty || i < first_inst_index) &&
+            addr == pc) {
+            // NOTE: Works for now, but probably better to implement this:
+            // if the first label is closer than half of height,
+            // first_inst_index = first_label else selected row in the middle
+            first_inst_index = addr_to_index(addr);
+            // skip to first label
+            while (strlen(assembly[--first_inst_index].label) == 0);
+            last_pc = pc;
+            draw_assembly();
+            return;
+        }
         if (addr == pc || addr == last_pc) {
             // deselects instruction when addr == last_pc
             draw_statement(row, assembly[i], addr == pc);
         }
-        row++;
         if (assembly[i].is_directive) {
-            addr++;
-            continue;
+            addr += assembly[i].num_args;
+        } else {
+            addr += 2;
         }
-        addr += 2;
-        if (strlen(assembly[i].label) != 0) row += 2;
+        // don't update the row until instructions are visible
+        if (i < first_inst_index) continue;
+        row++;
+        if (!assembly[i].is_directive && strlen(assembly[i].label) != 0)
+            row += 2;
     }
     last_pc = pc;
-}
-
-void draw_assembly(unsigned short pc) {
-    if (pc == REDRAW) pc = last_pc;
-    else last_pc = pc;
-    int row = d_starty;
-    int addr = 0x200;
-
-    for (int i = 0; i < num_statements && row < d_height - d_starty; i++) {
-        row = draw_statement(row, assembly[i], addr == pc);
-        if (assembly[i].is_directive) addr++;
-        else addr += 2;
-    }
 }
 
 void init_debug_graphics() {
     start_color();
     init_pair(NOT_SELECTED, COLOR_WHITE, COLOR_BLACK);
     init_pair(SELECTED, COLOR_BLACK, COLOR_WHITE);
-    clear_area(d_starty, d_startx + 1, d_height, d_width);
-    draw_assembly(PROGRAM_START);
+    draw_assembly();
 }
 
 void redraw_debug() {
-    clear_area(d_starty, d_startx + 1, d_height, d_width);
-    draw_assembly(REDRAW);
+    draw_assembly();
     DRAW_LINE();
 }
