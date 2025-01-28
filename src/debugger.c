@@ -4,6 +4,7 @@
  */
 #include "debugger.h"
 
+#include <ctype.h>
 #include <ncurses.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -22,6 +23,10 @@
 typedef enum {
     NOT_SELECTED,
     SELECTED,
+    NAME,
+    REGISTER,
+    IMMEDIATE,
+    ADDRESS,
 } Color;
 
 #define DRAW_LINE() mvvline(d_starty, d_startx, 0, d_height)
@@ -132,30 +137,67 @@ void set_debug_dimes(int y, int x, int h, int w) {
     d_width = w;
 }
 
+Color get_arg_color(char *arg) {
+    if (arg[0] == 'L') return ADDRESS;
+    if (isalpha(arg[0])) return REGISTER;
+    return IMMEDIATE;
+}
+
 int draw_statement(int row, AsmStatement stat, bool is_selected) {
     int x = d_startx + 1;
     move(row, x);
+
     if (stat.is_directive) {
-        printw("%s: %s %s", stat.label, stat.name, stat.args[0]);
+
+        // Draw label
+        if (!is_selected) attron(COLOR_PAIR(ADDRESS));
+        printw("%s: ", stat.label);
+        if (!is_selected) attroff(COLOR_PAIR(ADDRESS));
+
+        // Draw bytes
+        if (!is_selected) attron(COLOR_PAIR(IMMEDIATE));
+        printw("%s %s", stat.name, stat.args[0]);
         for (int i = 1; i < stat.num_args; i++) {
             printw(" %s", stat.args[i]);
         }
+        if (!is_selected) attroff(COLOR_PAIR(IMMEDIATE));
+
         row++;
         return row;
     }
+
+    // Draw label
     if (strlen(stat.label) != 0) {
+        attron(COLOR_PAIR(ADDRESS));
         mvprintw(row + 1, x, "%s:", stat.label);
+        attroff(COLOR_PAIR(ADDRESS));
+
         row += 2;
         move(row, x);
     }
+
     if (is_selected) attron(COLOR_PAIR(SELECTED));
+    // Draw name
+    if (!is_selected) attron(COLOR_PAIR(NAME));
     printw("\t%s", stat.name);
+    if (!is_selected) attroff(COLOR_PAIR(NAME));
+
+    // Draw arguments
     for (int i = 0; i < stat.num_args - 1; i++) {
+        Color color = get_arg_color(stat.args[i]);
+        if (!is_selected) attron(COLOR_PAIR(color));
         printw(" %s,", stat.args[i]);
+        if (!is_selected) attroff(COLOR_PAIR(color));
     }
+
+    // Draw last argument
     if (stat.num_args != 0) {
+        Color color = get_arg_color(stat.args[stat.num_args - 1]);
+        if (!is_selected) attron(COLOR_PAIR(color));
         printw(" %s", stat.args[stat.num_args - 1]);
+        if (!is_selected) attroff(COLOR_PAIR(color));
     }
+
     if (is_selected) attroff(COLOR_PAIR(SELECTED));
     row++;
     refresh();
@@ -245,8 +287,13 @@ void set_curr_inst(unsigned short pc) {
 
 void init_debug_graphics() {
     start_color();
-    init_pair(NOT_SELECTED, COLOR_WHITE, COLOR_BLACK);
     init_pair(SELECTED, COLOR_BLACK, COLOR_WHITE);
+    use_default_colors();
+    init_pair(NOT_SELECTED, -1, -1);
+    init_pair(NAME, COLOR_GREEN, -1);
+    init_pair(REGISTER, COLOR_RED, -1);
+    init_pair(IMMEDIATE, COLOR_BLUE, -1);
+    init_pair(ADDRESS, COLOR_YELLOW, -1);
     draw_assembly();
 }
 
