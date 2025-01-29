@@ -16,6 +16,8 @@
 #define DEFAULT_TICK_SPEED 900
 #define SECOND 1000000
 
+#define ctrl(x) ((x) & 0x1f)
+
 unsigned long get_time() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -42,7 +44,7 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
         return KEYBOARD_UNSET;
     }
     // KEYBOARD_BLOCKING
-    unsigned char key = KEYBOARD_UNSET;
+    int key = KEYBOARD_UNSET;
     while (key == KEYBOARD_UNSET) {
         handle_win_size(get_video_mem(), get_hi_res());
         key = getch();
@@ -57,11 +59,34 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
     return key;
 }
 
+void handle_game_controls(int key) {
+    switch (key) {
+        case ctrl('d'):
+            set_debugging(GRAPHIC_DEBUGGING);
+            reset_graphics(get_video_mem(), get_hi_res(), true);
+            break;
+    }
+}
+
+void handle_debug_controls() {
+    int key;
+    while ((key = getch()) != '\n') {
+        if (key == ctrl('d')) {
+            set_debugging(NO_DEBUGGING);
+            reset_graphics(get_video_mem(), get_hi_res(), false);
+            break;
+        }
+        handle_win_size(get_video_mem(), get_hi_res());
+        usleep(1000);
+    }
+}
+
 void update_keys(bool *keys) {
     static unsigned long last_pressed;
     unsigned long now = get_time();
-    char key = getch();
+    int key = getch();
     if (key == ERR && now - last_pressed < 50000) return;
+    handle_game_controls(key);
     for (int i = 0; i < 16; i++) {
         keys[i] = translate(key) == i;
     }
@@ -203,10 +228,7 @@ int main(int argc, char *argv[]) {
         printf("Exiting...\n");
         return 1;
     }
-
-    if (get_debugging() == GRAPHIC_DEBUGGING) {
-        set_assembly(program, has_quirks);
-    }
+    set_assembly(program, has_quirks);
     fclose(program);
 
     while (get_debugging() == CONSOLE_DEBUGGING) {
@@ -221,7 +243,7 @@ int main(int argc, char *argv[]) {
 
     init_graphics(get_debugging() == GRAPHIC_DEBUGGING);
     bool is_key_pressed[16];
-    unsigned int flag = IDLE;
+    unsigned int flag = IDLE_NOT_EXECUTED;
     int tick_count = 0;
     while (flag != EXIT) {
         handle_win_size(get_video_mem(), get_hi_res());
@@ -229,7 +251,8 @@ int main(int argc, char *argv[]) {
         if (get_debugging() == GRAPHIC_DEBUGGING) {
             set_curr_inst(get_chip8()->pc);
             // Run the whole fetch-decode-execute cycle
-            for (int i = 0; i < 3; i++) {
+            flag = IDLE_NOT_EXECUTED;
+            while (flag == IDLE_NOT_EXECUTED) {
                 flag = next_cycle();
             }
             tick_count++;
@@ -241,11 +264,7 @@ int main(int argc, char *argv[]) {
                 st_flash(flag == SOUND);
                 tick_count = 0;
             }
-
-            while (getch() != '\n') {
-                handle_win_size(get_video_mem(), get_hi_res());
-                usleep(tick_speed);
-            }
+            handle_debug_controls();
             continue;
         }
 

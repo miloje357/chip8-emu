@@ -135,11 +135,11 @@ unsigned int clear_op(unsigned short opcode) {
 }
 
 unsigned int return_op(unsigned short opcode) {
-    if (chip8.sp == 0xfe) return IDLE;
+    if (chip8.sp == 0xfe) return IDLE_EXECUTED;
     chip8.pc = *(unsigned short *)(chip8.memory + STACK_START + chip8.sp);
     chip8.sp -= 2;
     debug_printf("EXECUTED: RET\n");
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int scroll_down(unsigned short opcode) {
@@ -193,19 +193,19 @@ unsigned int exit_op(unsigned short opcode) {
 unsigned int low_op(unsigned short opcode) {
     chip8.hi_res = false;
     debug_printf("EXECUTED: LOW\n");
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int high_op(unsigned short opcode) {
     chip8.hi_res = true;
     debug_printf("EXECUTED: HIGH\n");
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int jump(unsigned short opcode) {
     chip8.pc = ADDR(opcode);
     debug_printf("EXECUTED: JP %04x\n", chip8.pc);
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int call(unsigned short opcode) {
@@ -217,7 +217,7 @@ unsigned int call(unsigned short opcode) {
     *(unsigned short *)(chip8.memory + STACK_START + chip8.sp) = chip8.pc;
     chip8.pc = ADDR(opcode);
     debug_printf("EXECUTED: CALL %04x\n", chip8.pc);
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int skip_equal_immediate(unsigned short opcode) {
@@ -225,7 +225,7 @@ unsigned int skip_equal_immediate(unsigned short opcode) {
         chip8.pc += 2;
     }
     debug_printf("EXECUTED: SE V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int skip_not_equal_immediate(unsigned short opcode) {
@@ -233,7 +233,7 @@ unsigned int skip_not_equal_immediate(unsigned short opcode) {
         chip8.pc += 2;
     }
     debug_printf("EXECUTED: SNE V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int skip_equal_reg(unsigned short opcode) {
@@ -241,46 +241,46 @@ unsigned int skip_equal_reg(unsigned short opcode) {
         chip8.pc += 2;
     }
     debug_printf("EXECUTED: SE V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int load_immediate(unsigned short opcode) {
     chip8.V[THIRD(opcode)] = IMMEDIATE(opcode);
     debug_printf("EXECUTED: LD V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int add_immediate(unsigned short opcode) {
     chip8.V[THIRD(opcode)] += IMMEDIATE(opcode);
     debug_printf("EXECUTED: ADD V%x, %x\n", THIRD(opcode), IMMEDIATE(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int load_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] = chip8.V[SECOND(opcode)];
     debug_printf("EXECUTED: LD V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int or_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] |= chip8.V[SECOND(opcode)];
     if (!chip8.has_superchip8_quirks) chip8.V[0xf] = 0;
     debug_printf("EXECUTED: OR V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int and_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] &= chip8.V[SECOND(opcode)];
     if (!chip8.has_superchip8_quirks) chip8.V[0xf] = 0;
     debug_printf("EXECUTED: AND V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int xor_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] ^= chip8.V[SECOND(opcode)];
     if (!chip8.has_superchip8_quirks) chip8.V[0xf] = 0;
     debug_printf("EXECUTED: XOR V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int add_reg(unsigned short opcode) {
@@ -288,7 +288,7 @@ unsigned int add_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] = sum;
     chip8.V[0xf] = sum > 0xff;
     debug_printf("EXECUTED: ADD V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int subtract_reg(unsigned short opcode) {
@@ -296,7 +296,7 @@ unsigned int subtract_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] = diff;
     chip8.V[0xf] = diff >= 0;
     debug_printf("EXECUTED: SUB V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int shift_right_reg(unsigned short opcode) {
@@ -307,7 +307,7 @@ unsigned int shift_right_reg(unsigned short opcode) {
         chip8.V[THIRD(opcode)] = chip8.V[SECOND(opcode)] >> 1;
     chip8.V[0xf] = vf;
     debug_printf("EXECUTED: SHR V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int subtract_negated_reg(unsigned short opcode) {
@@ -315,7 +315,7 @@ unsigned int subtract_negated_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] = -diff;
     chip8.V[0xf] = diff <= 0;
     debug_printf("EXECUTED: SUBN V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int shift_left_reg(unsigned short opcode) {
@@ -326,7 +326,7 @@ unsigned int shift_left_reg(unsigned short opcode) {
         chip8.V[THIRD(opcode)] = chip8.V[SECOND(opcode)] << 1;
     chip8.V[0xf] = vf;
     debug_printf("EXECUTED: SHL V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int skip_not_equal_reg(unsigned short opcode) {
@@ -334,26 +334,26 @@ unsigned int skip_not_equal_reg(unsigned short opcode) {
         chip8.pc += 2;
     }
     debug_printf("EXECUTED: SNE V%x, V%x\n", THIRD(opcode), SECOND(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int load_index(unsigned short opcode) {
     chip8.I = ADDR(opcode);
     debug_printf("EXECUTED: LD I, %04x\n", chip8.I);
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int jump_reg(unsigned short opcode) {
     int reg = (chip8.has_superchip8_quirks) ? THIRD(opcode) : 0;
     chip8.pc = ADDR(opcode) + chip8.V[reg];
     debug_printf("EXECUTED: JP V%x, %04x\n", reg, ADDR(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int random_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] = (rand() % 0x0100) & IMMEDIATE(opcode);
     debug_printf("EXECUTED: RND V%x, %02x\n", THIRD(opcode), IMMEDIATE(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int draw_op(unsigned short opcode) {
@@ -412,7 +412,7 @@ unsigned int skip_not_key_op(unsigned short opcode) {
 unsigned int delay_to_reg(unsigned short opcode) {
     chip8.V[THIRD(opcode)] = chip8.dt;
     debug_printf("EXECUTED: LD V%x, DT\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int key_to_reg(unsigned short opcode) {
@@ -425,32 +425,32 @@ unsigned int key_to_reg(unsigned short opcode) {
 unsigned int reg_to_delay(unsigned short opcode) {
     chip8.dt = chip8.V[THIRD(opcode)];
     debug_printf("EXECUTED: LD DT, V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int reg_to_sound(unsigned short opcode) {
     chip8.st = chip8.V[THIRD(opcode)];
     debug_printf("EXECUTED: LD ST, V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int add_index_reg(unsigned short opcode) {
     chip8.I += chip8.V[THIRD(opcode)];
     debug_printf("EXECUTED: ADD I, V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int load_font(unsigned short opcode) {
     chip8.I = (chip8.V[THIRD(opcode)] & 0x0f) * FONT_HEIGTH;
     debug_printf("EXECUTED: LD F, V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int load_big_font(unsigned short opcode) {
     chip8.I =
         BIG_FONT_OFFSET + (chip8.V[THIRD(opcode)] & 0x0f) * BIG_FONT_HEIGTH;
     debug_printf("EXECUTED: LD HF, V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int to_bcd(unsigned short opcode) {
@@ -460,33 +460,33 @@ unsigned int to_bcd(unsigned short opcode) {
         val /= 10;
     }
     debug_printf("EXECUTED: BCD V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int regs_to_memory(unsigned short opcode) {
     memcpy(chip8.memory + chip8.I % SIZE_MEMORY, chip8.V, THIRD(opcode) + 1);
     if (!chip8.has_superchip8_quirks) chip8.I += THIRD(opcode) + 1;
     debug_printf("EXECUTED: LD [I], V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int memory_to_regs(unsigned short opcode) {
     memcpy(chip8.V, chip8.memory + chip8.I % SIZE_MEMORY, THIRD(opcode) + 1);
     if (!chip8.has_superchip8_quirks) chip8.I += (THIRD(opcode)) + 1;
     debug_printf("EXECUTED: LD V%x, [I]\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int regs_to_flags(unsigned short opcode) {
     memcpy(chip8.flags, chip8.V, THIRD(opcode) + 1);
     debug_printf("DECODED:  LD R, V%x\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned int flags_to_regs(unsigned short opcode) {
     memcpy(chip8.V, chip8.flags, THIRD(opcode) + 1);
     debug_printf("DECODED:  LD V%x, R\n", THIRD(opcode));
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 instruction decode8(unsigned short opcode) {
@@ -669,7 +669,7 @@ unsigned int next_cycle() {
     unsigned static clock = 0;
     unsigned static short opcode;
     instruction static inst;
-    unsigned int flag = IDLE;
+    unsigned int flag = IDLE_NOT_EXECUTED;
     if (inst == NULL && clock == 2) {
         debug_printf("EXECUTED: Illegal opcode\n");
         clock++;
@@ -697,7 +697,7 @@ Flag decrement_timers() {
     chip8.dt -= (chip8.dt != 0) ? 1 : 0;
     chip8.st -= (chip8.st != 0) ? 1 : 0;
     if (chip8.st != 0) return SOUND;
-    return IDLE;
+    return IDLE_EXECUTED;
 }
 
 unsigned char *get_video_mem() { return chip8.memory + START_VIDEO_MEM; }

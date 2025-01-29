@@ -1,6 +1,8 @@
-/* TODO: 1. Add "syntax highlighting" to assembly
+/* TODO: 1. Display message when a key must be pressed in debugging mode
  *       2. Add scrolling
- *       3. Display message when a key must be pressed in debugging mode
+ *       3. Add state view
+ *       4. Add breakpoints
+ *       5. Add a way to turn on and off assembly and state view
  */
 #include "debugger.h"
 
@@ -148,7 +150,6 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
     move(row, x);
 
     if (stat.is_directive) {
-
         // Draw label
         if (!is_selected) attron(COLOR_PAIR(ADDRESS));
         printw("%s: ", stat.label);

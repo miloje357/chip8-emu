@@ -52,8 +52,10 @@ typedef struct {
  * @since 0.1.0
  */
 typedef enum {
-    IDLE,        /**< Flag for doing nothing */
-    DRAW,        /**< Flag for drawing to screen */
+    IDLE_NOT_EXECUTED, /**< Flag for doing nothing and instruction not executed
+                        */
+    IDLE_EXECUTED,     /**< Flag for doing nothing and instruction executed */
+    DRAW,              /**< Flag for drawing to screen */
     DRAW_HI_RES, /**< Flag for drawing to screen in high resoultion mode */
     CLEAR,       /**< Flag for clearing the screen */
     SCROLL,      /**< Flag for scrolling the screen */
@@ -67,11 +69,11 @@ typedef enum {
 
 /**
  * Loads program to memory
- * @param program: FILE handle of the program 
+ * @param program: FILE handle of the program
  * @return 0 if everything is ok, 1 otherwise
  * @since 1.2.0
  */
-int load_program(FILE *program_path);
+int load_program(FILE* program_path);
 
 /**
  * Initializes the program counter and stack pointer

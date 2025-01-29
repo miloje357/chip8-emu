@@ -49,6 +49,7 @@ void init_graphics(bool has_debugging_) {
     setlocale(LC_CTYPE, "");
     initscr();
     cbreak();
+    keypad(stdscr, true);
     noecho();
     nodelay(stdscr, true);
     curs_set(0);
@@ -84,6 +85,14 @@ void display_small_window_message() {
 void redraw_all(unsigned char *video_mem, bool hi_res) {
     redraw_game(video_mem, hi_res);
     if (has_debugging) redraw_debug();
+}
+
+void reset_graphics(unsigned char *video_mem, bool hi_res, bool has_debugging_) {
+    has_debugging = has_debugging_;
+    set_win_dimens(NULL, NULL);
+    init_game_graphics();
+    if (has_debugging) init_debug_graphics();
+    redraw_all(video_mem, hi_res);
 }
 
 void handle_win_size(unsigned char *video_mem, bool hi_res) {

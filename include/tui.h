@@ -24,7 +24,8 @@ void draw_border(int y, int x, int h, int w);
 void clear_area(int y, int x, int h, int w);
 
 /**
- * Runs all the ncurses initialization routines
+ * Runs all the ncurses initialization routines and game/debug init routines
+ * @param has_debugging: true if the emulator runs in graphical debugging mode
  * @since 1.2.0
  */
 void init_graphics(bool has_debugging);
@@ -36,5 +37,14 @@ void init_graphics(bool has_debugging);
  * @since 1.2.0
  */
 void handle_win_size(unsigned char *video_mem, bool hi_res);
+
+/**
+ * Runs game/debug init routines and redraws everything
+ * @param video_mem: chip8 video buffer (used for redrawing)
+ * @param hi_res: is the high resolution mode on (used for redrawing)
+ * @param has_debugging: true if the emulator runs in graphical debugging mode
+ * @since 1.2.0
+ */
+void reset_graphics(unsigned char *video_mem, bool hi_res, bool has_debugging);
 
 #endif
