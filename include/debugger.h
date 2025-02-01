@@ -73,16 +73,16 @@ void print_error();
 void set_debug_dimes(int y, int x, int h, int w);
 
 /**
- * Initialize the debugger graphics (draw the seperator)
+ * Initializes the debugger window and runs needed ncurses routines
  * @since 1.2.0
  */
 void init_debug_graphics();
 
 /**
- * Redraw the debugger
+ * Frees the debugger window
  * @since 1.2.0
  */
-void redraw_debug();
+void delete_debug_graphics();
 
 /**
  * Disassembles the current program and loads it to memory

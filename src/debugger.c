@@ -1,11 +1,12 @@
-/* TODO: 1. Display message when a key must be pressed in debugging mode
- *       2. Add scrolling
+/* TODO: 1. Add scrolling
+ *       2. Display message when a key must be pressed in debugging mode
  *       3. Add state view
  *       4. Add breakpoints
  *       5. Add a way to turn on and off assembly and state view
  */
 #include "debugger.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <ncurses.h>
 #include <stdarg.h>
@@ -16,7 +17,6 @@
 
 #include "chip8.h"
 #include "dasm.h"
-#include "tui.h"
 
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
@@ -31,16 +31,18 @@ typedef enum {
     ADDRESS,
 } Color;
 
-#define DRAW_LINE() mvvline(d_starty, d_startx, 0, d_height)
+#define DRAW_LINE() mvwvline(assembly_view, 0, 0, 0, av_height)
 
 const char *err_msg = NULL;
 DebugType debug_state = NO_DEBUGGING;
 
 AsmStatement *assembly;
 size_t num_statements;
-int d_startx, d_starty, d_width, d_height;
 unsigned short last_pc;
 unsigned int first_inst_index = 0;
+
+WINDOW *assembly_view;
+int av_startx, av_starty, av_width, av_height;
 
 void set_debugging(DebugType type) { debug_state = type; }
 
@@ -133,10 +135,10 @@ void free_assembly() {
 }
 
 void set_debug_dimes(int y, int x, int h, int w) {
-    d_starty = y;
-    d_startx = x;
-    d_height = h;
-    d_width = w;
+    av_starty = y;
+    av_startx = x;
+    av_height = h;
+    av_width = w;
 }
 
 Color get_arg_color(char *arg) {
@@ -146,22 +148,22 @@ Color get_arg_color(char *arg) {
 }
 
 int draw_statement(int row, AsmStatement stat, bool is_selected) {
-    int x = d_startx + 1;
-    move(row, x);
+    int x = 1;
+    wmove(assembly_view, row, x);
 
     if (stat.is_directive) {
         // Draw label
-        if (!is_selected) attron(COLOR_PAIR(ADDRESS));
-        printw("%s: ", stat.label);
-        if (!is_selected) attroff(COLOR_PAIR(ADDRESS));
+        if (!is_selected) wattron(assembly_view, COLOR_PAIR(ADDRESS));
+        wprintw(assembly_view, "%s: ", stat.label);
+        if (!is_selected) wattroff(assembly_view, COLOR_PAIR(ADDRESS));
 
         // Draw bytes
-        if (!is_selected) attron(COLOR_PAIR(IMMEDIATE));
-        printw("%s %s", stat.name, stat.args[0]);
+        if (!is_selected) wattron(assembly_view, COLOR_PAIR(IMMEDIATE));
+        wprintw(assembly_view, "%s %s", stat.name, stat.args[0]);
         for (int i = 1; i < stat.num_args; i++) {
-            printw(" %s", stat.args[i]);
+            wprintw(assembly_view, " %s", stat.args[i]);
         }
-        if (!is_selected) attroff(COLOR_PAIR(IMMEDIATE));
+        if (!is_selected) wattroff(assembly_view, COLOR_PAIR(IMMEDIATE));
 
         row++;
         return row;
@@ -169,39 +171,39 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
 
     // Draw label
     if (strlen(stat.label) != 0) {
-        attron(COLOR_PAIR(ADDRESS));
-        mvprintw(row + 1, x, "%s:", stat.label);
-        attroff(COLOR_PAIR(ADDRESS));
+        wattron(assembly_view, COLOR_PAIR(ADDRESS));
+        mvwprintw(assembly_view, row + 1, x, "%s:", stat.label);
+        wattroff(assembly_view, COLOR_PAIR(ADDRESS));
 
         row += 2;
-        move(row, x);
+        wmove(assembly_view, row, x);
     }
 
-    if (is_selected) attron(COLOR_PAIR(SELECTED));
+    if (is_selected) wattron(assembly_view, COLOR_PAIR(SELECTED));
     // Draw name
-    if (!is_selected) attron(COLOR_PAIR(NAME));
-    printw("\t%s", stat.name);
-    if (!is_selected) attroff(COLOR_PAIR(NAME));
+    if (!is_selected) wattron(assembly_view, COLOR_PAIR(NAME));
+    wprintw(assembly_view, "\t%s", stat.name);
+    if (!is_selected) wattroff(assembly_view, COLOR_PAIR(NAME));
 
     // Draw arguments
     for (int i = 0; i < stat.num_args - 1; i++) {
         Color color = get_arg_color(stat.args[i]);
-        if (!is_selected) attron(COLOR_PAIR(color));
-        printw(" %s,", stat.args[i]);
-        if (!is_selected) attroff(COLOR_PAIR(color));
+        if (!is_selected) wattron(assembly_view, COLOR_PAIR(color));
+        wprintw(assembly_view, " %s,", stat.args[i]);
+        if (!is_selected) wattroff(assembly_view, COLOR_PAIR(color));
     }
 
     // Draw last argument
     if (stat.num_args != 0) {
         Color color = get_arg_color(stat.args[stat.num_args - 1]);
-        if (!is_selected) attron(COLOR_PAIR(color));
-        printw(" %s", stat.args[stat.num_args - 1]);
-        if (!is_selected) attroff(COLOR_PAIR(color));
+        if (!is_selected) wattron(assembly_view, COLOR_PAIR(color));
+        wprintw(assembly_view, " %s", stat.args[stat.num_args - 1]);
+        if (!is_selected) wattroff(assembly_view, COLOR_PAIR(color));
     }
 
-    if (is_selected) attroff(COLOR_PAIR(SELECTED));
+    if (is_selected) wattroff(assembly_view, COLOR_PAIR(SELECTED));
     row++;
-    refresh();
+    wrefresh(assembly_view);
     return row;
 }
 
@@ -230,27 +232,29 @@ int addr_to_index(int target) {
 
 // TODO: Optimize with a lookup table
 void draw_assembly() {
-    int row = d_starty;
+    int row = 0;
     // addr must start at the address of the first displayed statement
     int addr = index_to_addr(first_inst_index);
 
-    clear_area(d_starty, d_startx + 1, d_height, d_width);
+    wclear(assembly_view);
     for (int i = first_inst_index;
-         i < num_statements && row < d_height - d_starty; i++) {
+         i < num_statements && row < av_height - av_starty; i++) {
         row = draw_statement(row, assembly[i], addr == last_pc);
         if (assembly[i].is_directive)
             addr += assembly[i].num_args;
         else
             addr += 2;
     }
+    DRAW_LINE();
+    wrefresh(assembly_view);
 }
 
 void set_curr_inst(unsigned short pc) {
-    int row = d_starty;
+    int row = av_starty;
     int addr = 0x200;
     for (int i = 0; i < num_statements; i++) {
         // row to be selected is out of bounds
-        if ((row >= d_height - d_starty || i < first_inst_index) &&
+        if ((row >= av_height - av_starty || i < first_inst_index) &&
             addr == pc) {
             row = 0;
             first_inst_index = addr_to_index(addr);
@@ -261,7 +265,7 @@ void set_curr_inst(unsigned short pc) {
             // Scroll by one to hide an unwanted instruction
             first_inst_index++;
             // if the label is too far, scroll to the current instruction
-            if (row >= d_height - d_starty - 5) {
+            if (row >= av_height - av_starty - 5) {
                 first_inst_index = addr_to_index(addr) - 3;
             }
             last_pc = pc;
@@ -295,10 +299,12 @@ void init_debug_graphics() {
     init_pair(REGISTER, COLOR_RED, -1);
     init_pair(IMMEDIATE, COLOR_BLUE, -1);
     init_pair(ADDRESS, COLOR_YELLOW, -1);
+    assembly_view = newwin(av_height, av_width, av_starty, av_startx);
     draw_assembly();
 }
 
-void redraw_debug() {
-    draw_assembly();
-    DRAW_LINE();
+void delete_debug_graphics() {
+    if (assembly_view == NULL) return;
+    delwin(assembly_view);
+    assembly_view = NULL;
 }

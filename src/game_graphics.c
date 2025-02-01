@@ -7,7 +7,6 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <assert.h>
 
 #include "chip8.h"
 #include "tui.h"
