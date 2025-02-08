@@ -30,8 +30,15 @@ typedef enum {
     ADDRESS,
 } Color;
 
+#define AV_REFRESH()                                            \
+    prefresh(assembly_view, first_row, 0, av_starty, av_startx, \
+             av_starty + av_height - 1, av_startx + av_width - 1)
 #define IS_INST_LABELED(stat) \
     (!((stat).is_directive) && strlen((stat).label) != 0)
+#define ABS(x) ((x > 0) ? x : -x)
+#define TO_FIRST_LABELED(up) \
+    while (first_row >= 0 && \
+           mvwinch(assembly_view, first_row += ((up) ? -1 : 1), 1) != ' ')
 
 const char *err_msg = NULL;
 DebugType debug_state = NO_DEBUGGING;
@@ -232,9 +239,7 @@ void draw_assembly() {
     assert(row == num_rows);
 
     mvwvline(assembly_view, 0, 0, 0, num_rows + av_height);
-    int status = prefresh(assembly_view, first_row, 0, av_starty, av_startx,
-                          av_starty + av_height - 1, av_startx + av_width - 1);
-    assert(status != ERR);
+    AV_REFRESH();
 }
 
 // TODO: Optimize
@@ -284,14 +289,11 @@ void set_curr_inst(unsigned short pc) {
     if (curr_selected_row < first_row ||
         curr_selected_row > first_row + av_height * 0.75) {
         first_row = curr_selected_row;
-        while (mvwinch(assembly_view, first_row--, 1) != ' ');
-        first_row++;
+        TO_FIRST_LABELED(true);
         if (curr_selected_row - first_row >= av_height)
             first_row = curr_selected_row;
     }
-    int status = prefresh(assembly_view, first_row, 0, av_starty, av_startx,
-                          av_starty + av_height - 1, av_startx + av_width - 1);
-    assert(status != ERR);
+    AV_REFRESH();
     last_pc = pc;
 }
 
@@ -313,4 +315,25 @@ void delete_debug_graphics() {
     if (assembly_view == NULL) return;
     delwin(assembly_view);
     assembly_view = NULL;
+}
+
+void scroll_by(ScrollUnit unit, int num) {
+    switch (unit) {
+        case LINE:
+            first_row += num;
+            break;
+        case LABEL:
+            for (int i = 0; i < ABS(num); i++) TO_FIRST_LABELED(num < 0);
+            break;
+        case TOP:
+            first_row = 0;
+            break;
+        case BOTTOM:
+            first_row = num_rows - av_height;
+            break;
+    }
+    if (first_row < 0) first_row = 0;
+    if (first_row > num_rows - av_height) first_row = num_rows - av_height;
+
+    AV_REFRESH();
 }

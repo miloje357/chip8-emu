@@ -1,4 +1,6 @@
+// TODO: Write keyboard.c
 #include <config.h>
+#include <ctype.h>
 #include <ncurses.h>
 #include <signal.h>
 #include <stdio.h>
@@ -69,15 +71,49 @@ void handle_game_controls(int key) {
 }
 
 void handle_debug_controls() {
-    int key;
+    int key, prev_key = 0;
+    int num_lines = 0;
     while ((key = getch()) != '\n') {
         if (key == ctrl('d')) {
             set_debugging(NO_DEBUGGING);
             reset_graphics(get_video_mem(), get_hi_res(), false);
             break;
         }
+        switch (key) {
+            case 'j':
+                scroll_by(LINE, (num_lines != 0) ? num_lines : 1);
+                break;
+            case 'k':
+                scroll_by(LINE, (num_lines != 0) ? -num_lines : -1);
+                break;
+            case '{':
+                scroll_by(LABEL, (num_lines != 0) ? -num_lines : -1);
+                break;
+            case '}':
+                scroll_by(LABEL, (num_lines != 0) ? num_lines : 1);
+                break;
+            case 'G':
+                scroll_by(BOTTOM, 0);
+                break;
+            case 'g':
+                if (prev_key != 'g') break;
+                prev_key = 0;
+                scroll_by(TOP, 0);
+                break;
+        }
+
+        // TODO: Deal with big numbers
+        if (key != ERR) {
+            if (isdigit(key)) {
+                num_lines *= 10;
+                num_lines += key - '0';
+            } else
+                num_lines = 0;
+            prev_key = key;
+        }
+
         handle_win_size(get_video_mem(), get_hi_res());
-        usleep(1000);
+        usleep(10000);
     }
 }
 

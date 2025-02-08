@@ -18,6 +18,12 @@ typedef enum {
                           state*/
 } DebugType;
 
+/**
+ * @see scroll_by
+ * @since 1.2.0
+ */
+typedef enum { LINE, LABEL, TOP, BOTTOM } ScrollUnit;
+
 /*
  * Set the debugging mode
  * @param type: proper DebugType
@@ -104,5 +110,13 @@ void free_assembly();
  * @since 1.2.0
  */
 void set_curr_inst(unsigned short pc);
+
+/**
+ * Scroll by some number of scroll units
+ * @param unit: see ScrollUnit
+ * @param num: number of units to scroll (ignored in case of TOP or BOTTOM)
+ * @since 1.2.0
+ */
+void scroll_by(ScrollUnit unit, int num);
 
 #endif
