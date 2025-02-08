@@ -21,7 +21,6 @@
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
-#define REDRAW 0
 typedef enum {
     NOT_SELECTED,
     SELECTED,
@@ -31,7 +30,8 @@ typedef enum {
     ADDRESS,
 } Color;
 
-#define DRAW_LINE() mvwvline(assembly_view, 0, 0, 0, av_height)
+#define IS_INST_LABELED(stat) \
+    (!((stat).is_directive) && strlen((stat).label) != 0)
 
 const char *err_msg = NULL;
 DebugType debug_state = NO_DEBUGGING;
@@ -39,7 +39,8 @@ DebugType debug_state = NO_DEBUGGING;
 AsmStatement *assembly;
 size_t num_statements;
 unsigned short last_pc;
-unsigned int first_inst_index = 0;
+size_t num_rows;
+int first_row = 0;
 
 WINDOW *assembly_view;
 int av_startx, av_starty, av_width, av_height;
@@ -207,86 +208,90 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
     return row;
 }
 
-int index_to_addr(int index) {
-    int addr = 0x200;
-    for (int i = 0; i < index; i++) {
-        if (assembly[i].is_directive)
-            addr += assembly[i].num_args;
-        else
-            addr += 2;
-    }
-    return addr;
-}
-
-int addr_to_index(int target) {
-    int addr = 0x200;
+size_t get_num_rows() {
+    size_t rows = 0;
     for (int i = 0; i < num_statements; i++) {
-        if (addr == target) return i;
-        if (assembly[i].is_directive)
-            addr += assembly[i].num_args;
-        else
-            addr += 2;
+        rows++;
+        if (IS_INST_LABELED(assembly[i])) rows += 2;
     }
-    return -1;
+    return rows;
 }
 
-// TODO: Optimize with a lookup table
 void draw_assembly() {
     int row = 0;
-    // addr must start at the address of the first displayed statement
-    int addr = index_to_addr(first_inst_index);
+    unsigned short addr = 0x200;
 
     wclear(assembly_view);
-    for (int i = first_inst_index;
-         i < num_statements && row < av_height - av_starty; i++) {
+    for (int i = 0; i < num_statements; i++) {
         row = draw_statement(row, assembly[i], addr == last_pc);
         if (assembly[i].is_directive)
             addr += assembly[i].num_args;
         else
             addr += 2;
     }
-    DRAW_LINE();
-    wrefresh(assembly_view);
+    assert(row == num_rows);
+
+    mvwvline(assembly_view, 0, 0, 0, num_rows + av_height);
+    int status = prefresh(assembly_view, first_row, 0, av_starty, av_startx,
+                          av_starty + av_height - 1, av_startx + av_width - 1);
+    assert(status != ERR);
+}
+
+// TODO: Optimize
+int addr_to_row(unsigned short target) {
+    int row = 0;
+    unsigned short addr = 0x200;
+
+    for (int i = 0; i < num_statements; i++) {
+        if (addr == target) return row;
+
+        if (assembly[i].is_directive)
+            addr += assembly[i].num_args;
+        else
+            addr += 2;
+
+        row++;
+        if (IS_INST_LABELED(assembly[i])) row += 2;
+    }
+    return -1;
+}
+
+// TODO: Optimize
+AsmStatement *addr_to_stat(unsigned short target) {
+    unsigned short addr = 0x200;
+
+    for (int i = 0; i < num_statements; i++) {
+        if (addr == target) return &assembly[i];
+        if (assembly[i].is_directive)
+            addr += assembly[i].num_args;
+        else
+            addr += 2;
+    }
+    return NULL;
 }
 
 void set_curr_inst(unsigned short pc) {
-    int row = av_starty;
-    int addr = 0x200;
-    for (int i = 0; i < num_statements; i++) {
-        // row to be selected is out of bounds
-        if ((row >= av_height - av_starty || i < first_inst_index) &&
-            addr == pc) {
-            row = 0;
-            first_inst_index = addr_to_index(addr);
-            // skip to first label
-            while (strlen(assembly[first_inst_index--].label) == 0) {
-                row++;
-            }
-            // Scroll by one to hide an unwanted instruction
-            first_inst_index++;
-            // if the label is too far, scroll to the current instruction
-            if (row >= av_height - av_starty - 5) {
-                first_inst_index = addr_to_index(addr) - 3;
-            }
-            last_pc = pc;
-            draw_assembly();
-            return;
-        }
-        if (addr == pc || addr == last_pc) {
-            // deselects instruction when addr == last_pc
-            draw_statement(row, assembly[i], addr == pc);
-        }
-        if (assembly[i].is_directive) {
-            addr += assembly[i].num_args;
-        } else {
-            addr += 2;
-        }
-        // don't update the row until instructions are visible
-        if (i < first_inst_index) continue;
-        row++;
-        if (!assembly[i].is_directive && strlen(assembly[i].label) != 0)
-            row += 2;
+    int last_selected_row = addr_to_row(last_pc);
+    int curr_selected_row = addr_to_row(pc);
+    AsmStatement *last_selected_stat = addr_to_stat(last_pc);
+    AsmStatement *curr_selected_stat = addr_to_stat(pc);
+
+    draw_statement(curr_selected_row, *curr_selected_stat, true);
+    if (last_selected_stat != NULL)
+        draw_statement(last_selected_row, *last_selected_stat, false);
+
+    // Is selected row is out of bounds?
+    if (curr_selected_row < first_row ||
+        curr_selected_row > first_row + av_height * 0.75) {
+        first_row = curr_selected_row;
+        while (mvwinch(assembly_view, first_row--, 1) != ' ');
+        first_row++;
+        if (curr_selected_row - first_row >= av_height)
+            first_row = curr_selected_row;
     }
+    int status = prefresh(assembly_view, first_row, 0, av_starty, av_startx,
+                          av_starty + av_height - 1, av_startx + av_width - 1);
+    assert(status != ERR);
     last_pc = pc;
 }
 
@@ -299,7 +304,8 @@ void init_debug_graphics() {
     init_pair(REGISTER, COLOR_RED, -1);
     init_pair(IMMEDIATE, COLOR_BLUE, -1);
     init_pair(ADDRESS, COLOR_YELLOW, -1);
-    assembly_view = newwin(av_height, av_width, av_starty, av_startx);
+    num_rows = get_num_rows();
+    assembly_view = newpad(num_rows + av_height, av_width);
     draw_assembly();
 }
 
