@@ -1,21 +1,16 @@
-/* TODO: 1. Add scrolling
- *       2. Display message when a key must be pressed in debugging mode
- *       3. Add state view
- *       4. Add breakpoints
- *       5. Add a way to turn on and off assembly and state view
+/* TODO: 1. Add state view
+ *       2. Add 'key needs to be pressed' window in state view
+ *       2. Add breakpoints and a 'add breakpoint' window to state view
+ *       3. Display message when a key must be pressed in debugging mode
  */
 #include "debugger.h"
 
-#include <assert.h>
 #include <ctype.h>
 #include <ncurses.h>
 #include <stdarg.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "chip8.h"
 #include "dasm.h"
 
 #define ANSI_COLOR_RED "\x1b[31m"
@@ -38,7 +33,7 @@ typedef enum {
 #define ABS(x) ((x > 0) ? x : -x)
 #define TO_FIRST_LABELED(up) \
     while (first_row >= 0 && \
-           mvwinch(assembly_view, first_row += ((up) ? -1 : 1), 1) != ' ')
+           mvwinch(assembly_view, first_row += ((up) ? -1 : 1), 5) != ' ')
 
 const char *err_msg = NULL;
 DebugType debug_state = NO_DEBUGGING;
@@ -160,6 +155,7 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
     wmove(assembly_view, row, x);
 
     if (stat.is_directive) {
+        wprintw(assembly_view, "%3d ", row + 1);
         // Draw label
         if (!is_selected) wattron(assembly_view, COLOR_PAIR(ADDRESS));
         wprintw(assembly_view, "%s: ", stat.label);
@@ -179,14 +175,17 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
 
     // Draw label
     if (strlen(stat.label) != 0) {
+        wprintw(assembly_view, "%3d ", row + 1);
+        mvwprintw(assembly_view, row + 1, x, "%3d ", row + 2);
         wattron(assembly_view, COLOR_PAIR(ADDRESS));
-        mvwprintw(assembly_view, row + 1, x, "%s:", stat.label);
+        wprintw(assembly_view, "%s:", stat.label);
         wattroff(assembly_view, COLOR_PAIR(ADDRESS));
 
         row += 2;
         wmove(assembly_view, row, x);
     }
 
+    wprintw(assembly_view, "%3d ", row + 1);
     if (is_selected) wattron(assembly_view, COLOR_PAIR(SELECTED));
     // Draw name
     if (!is_selected) wattron(assembly_view, COLOR_PAIR(NAME));
@@ -236,7 +235,6 @@ void draw_assembly() {
         else
             addr += 2;
     }
-    assert(row == num_rows);
 
     mvwvline(assembly_view, 0, 0, 0, num_rows + av_height);
     AV_REFRESH();

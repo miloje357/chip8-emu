@@ -1,3 +1,4 @@
+// TODO: Add a help screen with keybinds when pressing '?'
 #include <locale.h>
 #include <ncurses.h>
 #include <stdlib.h>

@@ -9,6 +9,7 @@ A ncurses CHIP-8 emulator developed for educational purposes.
 ## Notes
  - **KEYBOARD INPUT IS TERRIBLE**
  - Implements a flash, not a buzzer
+ - Scrolling up or down by a line in graphical debug mode causes flickering
  - Modern ``0x00Cn`` (SCD) instruction (see [Scroll Test](https://github.com/Timendus/chip8-test-suite#scrolling-test))
  - ``0x00FF`` (HIGH) and ``0x00FE`` (LOW) instructions don't behave like described [here](https://github.com/Chromatophore/HP48-Superchip/blob/master/investigations/quirk_display.md)
  - Flag registers aren't persistent, like described [here](https://johnearnest.github.io/Octo/docs/SuperChip.html)

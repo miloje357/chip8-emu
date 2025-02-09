@@ -3,9 +3,7 @@
 #include <ctype.h>
 #include <ncurses.h>
 #include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -61,6 +59,7 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
     return key;
 }
 
+// BUG: Doesn't trigger "win size too small" opon entering debugging
 void handle_game_controls(int key) {
     switch (key) {
         case ctrl('d'):
