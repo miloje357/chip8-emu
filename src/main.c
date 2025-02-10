@@ -284,6 +284,7 @@ int main(int argc, char *argv[]) {
         handle_win_size(get_video_mem(), get_hi_res());
 
         if (get_debugging() == GRAPHIC_DEBUGGING) {
+            draw_state(get_chip8());
             set_curr_inst(get_chip8()->pc);
             // Run the whole fetch-decode-execute cycle
             flag = IDLE_NOT_EXECUTED;

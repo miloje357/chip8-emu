@@ -1,5 +1,4 @@
-/* TODO: 1. Add state view
- *       2. Add 'key needs to be pressed' window in state view
+/* TODO: 1. Add 'key needs to be pressed' window in state view
  *       2. Add breakpoints and a 'add breakpoint' window to state view
  *       3. Display message when a key must be pressed in debugging mode
  */
@@ -11,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "chip8.h"
 #include "dasm.h"
 
 #define ANSI_COLOR_RED "\x1b[31m"
@@ -23,6 +23,7 @@ typedef enum {
     REGISTER,
     IMMEDIATE,
     ADDRESS,
+    STACK_POINTER,
 } Color;
 
 #define AV_REFRESH()                                            \
@@ -41,11 +42,14 @@ DebugType debug_state = NO_DEBUGGING;
 AsmStatement *assembly;
 size_t num_statements;
 unsigned short last_pc;
-size_t num_rows;
-int first_row = 0;
 
 WINDOW *assembly_view;
 int av_startx, av_starty, av_width, av_height;
+size_t num_rows;
+int first_row = 0;
+
+WINDOW *state_view;
+int sv_startx, sv_starty, sv_width, sv_height;
 
 void set_debugging(DebugType type) { debug_state = type; }
 
@@ -137,11 +141,18 @@ void free_assembly() {
     free(assembly);
 }
 
-void set_debug_dimes(int y, int x, int h, int w) {
+void set_assembly_dimens(int y, int x, int h, int w) {
     av_starty = y;
     av_startx = x;
     av_height = h;
     av_width = w;
+}
+
+void set_state_dimens(int y, int x, int h, int w) {
+    sv_starty = y;
+    sv_startx = x;
+    sv_height = h;
+    sv_width = w;
 }
 
 Color get_arg_color(char *arg) {
@@ -295,26 +306,6 @@ void set_curr_inst(unsigned short pc) {
     last_pc = pc;
 }
 
-void init_debug_graphics() {
-    start_color();
-    init_pair(SELECTED, COLOR_BLACK, COLOR_WHITE);
-    use_default_colors();
-    init_pair(NOT_SELECTED, -1, -1);
-    init_pair(NAME, COLOR_GREEN, -1);
-    init_pair(REGISTER, COLOR_RED, -1);
-    init_pair(IMMEDIATE, COLOR_BLUE, -1);
-    init_pair(ADDRESS, COLOR_YELLOW, -1);
-    num_rows = get_num_rows();
-    assembly_view = newpad(num_rows + av_height, av_width);
-    draw_assembly();
-}
-
-void delete_debug_graphics() {
-    if (assembly_view == NULL) return;
-    delwin(assembly_view);
-    assembly_view = NULL;
-}
-
 void scroll_by(ScrollUnit unit, int num) {
     switch (unit) {
         case LINE:
@@ -334,4 +325,134 @@ void scroll_by(ScrollUnit unit, int num) {
     if (first_row > num_rows - av_height) first_row = num_rows - av_height;
 
     AV_REFRESH();
+}
+
+void draw_registers(unsigned char *regs, bool has_been_init,
+                    bool should_draw_last) {
+    static unsigned char last_regs[16];
+    const char *registers_msg = "Registers:       ";
+    mvwaddstr(state_view, 1, 0, registers_msg);
+    if (should_draw_last) {
+        for (int i = 0; i < 16; i++) {
+            mvwprintw(state_view, 1, strlen(registers_msg) + i * 5, "%02x   ",
+                      last_regs[i]);
+        }
+        return;
+    }
+    for (int i = 0; i < 16; i++) {
+        if (has_been_init && regs[i] == last_regs[i]) continue;
+        mvwprintw(state_view, 1, strlen(registers_msg) + i * 5, "%02x   ",
+                  regs[i]);
+    }
+    memcpy(last_regs, regs, 16);
+}
+
+// NOTE: Stack size is always 16
+void draw_stack(unsigned char *stack, unsigned char sp, bool has_been_init,
+                bool should_draw_last) {
+    static unsigned char last_sp;
+    static unsigned char last_stack[32];
+    const char *stack_msg = "Stack:           ";
+    mvwaddstr(state_view, 2, 0, stack_msg);
+    if (should_draw_last) {
+        for (int i = 0; i < 32; i += 2) {
+            if (i == last_sp) wattron(state_view, COLOR_PAIR(STACK_POINTER));
+            mvwprintw(state_view, 2, strlen(stack_msg) + i / 2 * 5, "%04x ",
+                      ((unsigned short *)last_stack)[i]);
+            if (i == last_sp) wattroff(state_view, COLOR_PAIR(STACK_POINTER));
+        }
+        return;
+    }
+    for (int i = 0; i < 32; i += 2) {
+        if (has_been_init &&
+            ((unsigned short *)stack)[i] == ((unsigned short *)last_stack)[i] &&
+            last_sp == sp && sp != i)
+            continue;
+        if (i == sp) wattron(state_view, COLOR_PAIR(STACK_POINTER));
+        mvwprintw(state_view, 2, strlen(stack_msg) + i / 2 * 5, "%04x ",
+                  ((unsigned short *)stack)[i]);
+        if (i == sp) wattroff(state_view, COLOR_PAIR(STACK_POINTER));
+    }
+    memcpy(last_stack, stack, 16 * 2);
+    last_sp = sp;
+}
+
+void draw_special(unsigned char sp, unsigned short pc, unsigned short I,
+                  unsigned char dt, unsigned char st, bool has_been_init,
+                  bool should_draw_last) {
+    static unsigned char last_sp;
+    static unsigned short last_pc;
+    static unsigned short last_I;
+    static unsigned char last_dt, last_st;
+    if (should_draw_last) {
+        mvwprintw(state_view, 3, 0, "Stack pointer:   %02x", last_sp);
+        mvwprintw(state_view, 4, 0, "Program counter: %04x", last_pc);
+        mvwprintw(state_view, 5, 0, "Index register:  %04x", last_I);
+        mvwprintw(state_view, 6, 0, "Delay timer:     %02x", last_dt);
+        mvwprintw(state_view, 7, 0, "Sound timer:     %02x", last_st);
+        return;
+    }
+    if (!has_been_init || last_sp != sp)
+        mvwprintw(state_view, 3, 0, "Stack pointer:   %02x", sp);
+    if (!has_been_init || last_pc != pc)
+        mvwprintw(state_view, 4, 0, "Program counter: %04x", pc);
+    if (!has_been_init || last_I != I)
+        mvwprintw(state_view, 5, 0, "Index register:  %04x", I);
+    if (!has_been_init || last_dt != dt)
+        mvwprintw(state_view, 6, 0, "Delay timer:     %02x", dt);
+    if (!has_been_init || last_st != st)
+        mvwprintw(state_view, 7, 0, "Sound timer:     %02x", st);
+    last_sp = sp;
+    last_pc = pc;
+    last_I = I;
+    last_dt = dt;
+    last_st = st;
+}
+
+void draw_state(Chip8Context *chip8) {
+    static bool has_been_init;
+
+    if (chip8 == NULL) {
+        draw_registers(NULL, has_been_init, true);
+        draw_special(0, 0, 0, 0, 0, has_been_init, true);
+        draw_stack(NULL, 0, has_been_init, true);
+        mvwhline(state_view, 0, 0, 0, sv_width);
+        wrefresh(state_view);
+        return;
+    }
+
+    draw_registers(chip8->V, has_been_init, false);
+    draw_special(chip8->sp, chip8->pc, chip8->I, chip8->dt, chip8->st,
+                 has_been_init, false);
+    draw_stack(chip8->memory + STACK_START, chip8->sp, has_been_init, false);
+
+    wrefresh(state_view);
+    has_been_init = true;
+}
+
+void init_debug_graphics() {
+    start_color();
+    init_pair(SELECTED, COLOR_BLACK, COLOR_WHITE);
+    use_default_colors();
+    init_pair(NOT_SELECTED, -1, -1);
+    init_pair(NAME, COLOR_GREEN, -1);
+    init_pair(REGISTER, COLOR_RED, -1);
+    init_pair(IMMEDIATE, COLOR_BLUE, -1);
+    init_pair(ADDRESS, COLOR_YELLOW, -1);
+    init_pair(STACK_POINTER, COLOR_RED, -1);
+    num_rows = get_num_rows();
+    assembly_view = newpad(num_rows + av_height, av_width);
+    state_view = newwin(sv_height, sv_width, sv_starty, sv_startx);
+    draw_assembly();
+    draw_state(NULL);
+}
+
+void delete_debug_graphics() {
+    if (assembly_view == NULL) return;
+    delwin(assembly_view);
+    assembly_view = NULL;
+
+    if (state_view == NULL) return;
+    delwin(state_view);
+    state_view = NULL;
 }

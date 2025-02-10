@@ -12,7 +12,8 @@
 #define SECONDS 1000000
 
 #define DEBUG_RATIO 0.8
-#define DEBUG_STARTY 0
+#define AV_STARTY 0
+#define SV_STARTX 0
 #define SMALL_WINDOW_MESSAGE "Please resize the window"
 
 bool has_debugging;
@@ -34,15 +35,16 @@ void set_win_dimens(int *game_width, int *game_height) {
     width = ws.ws_col;
     height = ws.ws_row;
     int gw = (has_debugging) ? width * DEBUG_RATIO : width;
-    int gh = height;
+    int gh = (has_debugging) ? height * DEBUG_RATIO : height;
     if (game_width != NULL) {
         *game_width = gw;
     }
     if (game_height != NULL) {
-        *game_height = gw;
+        *game_height = gh;
     }
     set_game_dimens(gh, gw);
-    set_debug_dimes(DEBUG_STARTY, gw, height, width - gw);
+    set_assembly_dimens(AV_STARTY, gw, height, width - gw);
+    set_state_dimens(gh, SV_STARTX, height - gh, gw);
 }
 
 void init_graphics(bool has_debugging_) {
@@ -108,6 +110,7 @@ void handle_win_size(unsigned char *video_mem, bool hi_res) {
     int game_width, game_height;
     set_win_dimens(&game_width, &game_height);
     if (last_win_w == width && last_win_h == height) return;
+    // TODO: Add +2 to fix a bug
     while (game_height < GAME_HEIGHT || game_width < GAME_WIDTH) {
         set_win_dimens(&game_width, &game_height);
         if (last_win_w != width || last_win_h != height) {

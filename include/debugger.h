@@ -69,14 +69,24 @@ void set_error(const char *new_err_msg);
 void print_error();
 
 /**
- * Set the geometry of the debugger
- * @param y: y coordinate of the origin of the debugger
- * @param x: x coordinate of the origin of the debugger
- * @param h: height of the debugger
- * @param w: width of the debugger
+ * Set the geometry of the assembly view
+ * @param y: y coordinate of the origin of the assembly view
+ * @param x: x coordinate of the origin of the assembly view
+ * @param h: height of the assembly view
+ * @param w: width of the assembly view
  * @since 1.2.0
  */
-void set_debug_dimes(int y, int x, int h, int w);
+void set_assembly_dimens(int y, int x, int h, int w);
+
+/**
+ * Set the geometry of the state view
+ * @param y: y coordinate of the origin of the state view
+ * @param x: x coordinate of the origin of the state view
+ * @param h: height of the state view
+ * @param w: width of the state view
+ * @since 1.2.0
+ */
+void set_state_dimens(int y, int x, int h, int w);
 
 /**
  * Initializes the debugger window and runs needed ncurses routines
@@ -118,5 +128,14 @@ void set_curr_inst(unsigned short pc);
  * @since 1.2.0
  */
 void scroll_by(ScrollUnit unit, int num);
+
+/**
+ * Draws registers, program counter, stack pointer, index, delay and sound
+ * timers
+ * @see `print_state()`
+ * @param chip8: pointer to a Chip8Context (see `get_chip8()` in include/chip8.h)
+ * @since 1.2.0
+ */
+void draw_state(Chip8Context *chip8);
 
 #endif
