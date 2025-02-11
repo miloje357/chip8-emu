@@ -8,9 +8,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "assembly_view.h"
 #include "chip8.h"
-#include "debugger.h"
 #include "game_graphics.h"
+#include "state_view.h"
 #include "tui.h"
 
 #define DEFAULT_TICK_SPEED 900

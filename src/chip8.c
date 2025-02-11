@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "debugger.h"
+#include "state_view.h"
 
 #define GET_FROM_MEM(addr) chip8.memory[(addr) % SIZE_MEMORY]
 

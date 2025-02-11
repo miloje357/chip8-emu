@@ -6,7 +6,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "debugger.h"
+#include "assembly_view.h"
+#include "state_view.h"
 #include "game_graphics.h"
 
 #define SECONDS 1000000
@@ -59,7 +60,10 @@ void init_graphics(bool has_debugging_) {
     set_win_dimens(NULL, NULL);
     init_game_graphics();
     refresh();
-    if (has_debugging) init_debug_graphics();
+    if (has_debugging) {
+        init_state_graphics();
+        init_assembly_graphics();
+    }
 }
 
 void draw_border(int y, int x, int h, int w) {
@@ -88,8 +92,10 @@ void display_small_window_message() {
 void redraw_all(unsigned char *video_mem, bool hi_res) {
     redraw_game(video_mem, hi_res);
     if (has_debugging) {
-        delete_debug_graphics();
-        init_debug_graphics();
+        delete_state_graphics();
+        delete_assembly_graphics();
+        init_state_graphics();
+        init_assembly_graphics();
     }
 }
 
@@ -98,10 +104,13 @@ void reset_graphics(unsigned char *video_mem, bool hi_res,
     has_debugging = has_debugging_;
     set_win_dimens(NULL, NULL);
     init_game_graphics();
-    if (has_debugging)
-        init_debug_graphics();
-    else
-        delete_debug_graphics();
+    if (has_debugging) {
+        init_state_graphics();
+        init_assembly_graphics();
+    } else {
+        delete_state_graphics();
+        delete_assembly_graphics();
+    }
     redraw_all(video_mem, hi_res);
 }
 

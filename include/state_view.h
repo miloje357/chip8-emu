@@ -1,8 +1,7 @@
-#ifndef DEBUGGER_H_
-#define DEBUGGER_H_
+#ifndef STATE_VIEW_H_
+#define STATE_VIEW_H_
 
 #include <stdbool.h>
-#include <stdio.h>
 
 #include "chip8.h"
 
@@ -17,12 +16,6 @@ typedef enum {
     CONSOLE_DEBUGGING  /*>> Emulator doesn't display graphics, only the current
                           state*/
 } DebugType;
-
-/**
- * @see scroll_by
- * @since 1.2.0
- */
-typedef enum { LINE, LABEL, TOP, BOTTOM } ScrollUnit;
 
 /*
  * Set the debugging mode
@@ -69,16 +62,6 @@ void set_error(const char *new_err_msg);
 void print_error();
 
 /**
- * Set the geometry of the assembly view
- * @param y: y coordinate of the origin of the assembly view
- * @param x: x coordinate of the origin of the assembly view
- * @param h: height of the assembly view
- * @param w: width of the assembly view
- * @since 1.2.0
- */
-void set_assembly_dimens(int y, int x, int h, int w);
-
-/**
  * Set the geometry of the state view
  * @param y: y coordinate of the origin of the state view
  * @param x: x coordinate of the origin of the state view
@@ -89,51 +72,23 @@ void set_assembly_dimens(int y, int x, int h, int w);
 void set_state_dimens(int y, int x, int h, int w);
 
 /**
- * Initializes the debugger window and runs needed ncurses routines
+ * Initializes the state view window and runs needed ncurses routines
  * @since 1.2.0
  */
-void init_debug_graphics();
+void init_state_graphics();
 
 /**
- * Frees the debugger window
+ * Frees the state view window
  * @since 1.2.0
  */
-void delete_debug_graphics();
-
-/**
- * Disassembles the current program and loads it to memory
- * @param src: The source program
- * @param has_quirks: true if the emulator runs with Super Chip8 quirks
- * @since 1.2.0
- */
-void set_assembly(FILE *src, bool has_quirks);
-
-/**
- * Frees the assembly memory
- * @since 1.2.0
- */
-void free_assembly();
-
-/**
- * Selects the current instruction in assembly view
- * @param pc: the program counter
- * @since 1.2.0
- */
-void set_curr_inst(unsigned short pc);
-
-/**
- * Scroll by some number of scroll units
- * @param unit: see ScrollUnit
- * @param num: number of units to scroll (ignored in case of TOP or BOTTOM)
- * @since 1.2.0
- */
-void scroll_by(ScrollUnit unit, int num);
+void delete_state_graphics();
 
 /**
  * Draws registers, program counter, stack pointer, index, delay and sound
  * timers
  * @see `print_state()`
- * @param chip8: pointer to a Chip8Context (see `get_chip8()` in include/chip8.h)
+ * @param chip8: pointer to a Chip8Context (see `get_chip8()` in
+ * include/chip8.h)
  * @since 1.2.0
  */
 void draw_state(Chip8Context *chip8);
