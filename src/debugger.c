@@ -1,20 +1,25 @@
 /* TODO: 1. Add 'key needs to be pressed' window in state view
  *       2. Add breakpoints and a 'add breakpoint' window to state view
- *       3. Display message when a key must be pressed in debugging mode
+ *       3. Separate status_view and assembly_view from debugger.c
  */
 #include "debugger.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <ncurses.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "chip8.h"
 #include "dasm.h"
 
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
+
+#define MAX_STATE_LABEL_LEN 17
+#define MAX_STATE_ENTRY_LEN (MAX_STATE_LABEL_LEN + 5 * 16)
 
 typedef enum {
     NOT_SELECTED,
@@ -35,6 +40,10 @@ typedef enum {
 #define TO_FIRST_LABELED(up) \
     while (first_row >= 0 && \
            mvwinch(assembly_view, first_row += ((up) ? -1 : 1), 5) != ' ')
+#define SET_MV_BG()                                  \
+    for (int i = 0; i < mv_height * mv_width; i++) { \
+        waddstr(message_view, "╱");                  \
+    }
 
 const char *err_msg = NULL;
 DebugType debug_state = NO_DEBUGGING;
@@ -50,6 +59,9 @@ int first_row = 0;
 
 WINDOW *state_view;
 int sv_startx, sv_starty, sv_width, sv_height;
+
+WINDOW *message_view;
+int mv_startx, mv_starty, mv_width, mv_height;
 
 void set_debugging(DebugType type) { debug_state = type; }
 
@@ -334,14 +346,14 @@ void draw_registers(unsigned char *regs, bool has_been_init,
     mvwaddstr(state_view, 1, 0, registers_msg);
     if (should_draw_last) {
         for (int i = 0; i < 16; i++) {
-            mvwprintw(state_view, 1, strlen(registers_msg) + i * 5, "%02x   ",
+            mvwprintw(state_view, 1, MAX_STATE_LABEL_LEN + i * 5, "%02x   ",
                       last_regs[i]);
         }
         return;
     }
     for (int i = 0; i < 16; i++) {
         if (has_been_init && regs[i] == last_regs[i]) continue;
-        mvwprintw(state_view, 1, strlen(registers_msg) + i * 5, "%02x   ",
+        mvwprintw(state_view, 1, MAX_STATE_LABEL_LEN + i * 5, "%02x   ",
                   regs[i]);
     }
     memcpy(last_regs, regs, 16);
@@ -357,7 +369,7 @@ void draw_stack(unsigned char *stack, unsigned char sp, bool has_been_init,
     if (should_draw_last) {
         for (int i = 0; i < 32; i += 2) {
             if (i == last_sp) wattron(state_view, COLOR_PAIR(STACK_POINTER));
-            mvwprintw(state_view, 2, strlen(stack_msg) + i / 2 * 5, "%04x ",
+            mvwprintw(state_view, 2, MAX_STATE_LABEL_LEN + i / 2 * 5, "%04x ",
                       ((unsigned short *)last_stack)[i]);
             if (i == last_sp) wattroff(state_view, COLOR_PAIR(STACK_POINTER));
         }
@@ -369,7 +381,7 @@ void draw_stack(unsigned char *stack, unsigned char sp, bool has_been_init,
             last_sp == sp && sp != i)
             continue;
         if (i == sp) wattron(state_view, COLOR_PAIR(STACK_POINTER));
-        mvwprintw(state_view, 2, strlen(stack_msg) + i / 2 * 5, "%04x ",
+        mvwprintw(state_view, 2, MAX_STATE_LABEL_LEN + i / 2 * 5, "%04x ",
                   ((unsigned short *)stack)[i]);
         if (i == sp) wattroff(state_view, COLOR_PAIR(STACK_POINTER));
     }
@@ -430,6 +442,77 @@ void draw_state(Chip8Context *chip8) {
     has_been_init = true;
 }
 
+void init_message_view() {
+    mv_height = sv_height - 1;
+    mv_width = sv_width - MAX_STATE_ENTRY_LEN - 1;
+    mv_starty = 1;
+    mv_startx = MAX_STATE_ENTRY_LEN + 1;
+    message_view =
+        derwin(state_view, mv_height, mv_width, mv_starty, mv_startx);
+    mvwvline(state_view, mv_starty, mv_startx - 1, 0, mv_height);
+    wrefresh(state_view);
+}
+
+// NOTE: Text doesn't wrap
+void set_message(const char *message) {
+    wclear(message_view);
+    SET_MV_BG();
+    WINDOW *message_win =
+        derwin(message_view, 3, 2 + strlen(message), (mv_height - 3) / 2,
+               (mv_width - strlen(message) - 2) / 2);
+    wborder(message_win, 0, 0, 0, 0, 0, 0, 0, 0);
+    mvwaddstr(message_win, 1, 1, message);
+    delwin(message_win);
+    wrefresh(message_view);
+}
+
+// NOTE: Free after use
+// TODO: Add more movement options
+char *get_from_field(const char *title, size_t *len) {
+    // -2 for space around message_win, -2 for border
+    size_t maxlen = mv_width - 2 - 2;
+    char *buffer = malloc(maxlen);
+    memset(buffer, 0, maxlen);
+
+    wclear(message_view);
+    SET_MV_BG();
+    WINDOW *message_win =
+        derwin(message_view, 3, mv_width - 2, (mv_height - 3) / 2, 1);
+    nodelay(message_win, false);
+    keypad(message_win, true);
+    wclear(message_win);
+    wborder(message_win, 0, 0, 0, 0, 0, 0, 0, 0);
+    mvwaddstr(message_win, 0, 1, title);
+    wrefresh(message_view);
+
+    int key;
+    *len = 0;
+    wmove(message_win, 1, 1);
+    while ((key = wgetch(message_win)) != '\n') {
+        curs_set(1);
+        if (key == KEY_BACKSPACE) {
+            if (*len <= 0) continue;
+            mvwaddch(message_win, 1, *len, ' ');
+            wmove(message_win, 1, *len);
+            buffer[(*len)--] = '\0';
+            continue;
+        }
+        if (*len >= maxlen || key >= 256 || key == '\t') {
+            curs_set(0);
+            continue;
+        }
+        buffer[(*len)++] = key;
+        buffer[*len] = '\0';
+        waddch(message_win, key);
+        wrefresh(message_win);
+    }
+
+    curs_set(0);
+    delwin(message_win);
+    wclear(message_view);
+    return buffer;
+}
+
 void init_debug_graphics() {
     start_color();
     init_pair(SELECTED, COLOR_BLACK, COLOR_WHITE);
@@ -443,6 +526,7 @@ void init_debug_graphics() {
     num_rows = get_num_rows();
     assembly_view = newpad(num_rows + av_height, av_width);
     state_view = newwin(sv_height, sv_width, sv_starty, sv_startx);
+    init_message_view();
     draw_assembly();
     draw_state(NULL);
 }
