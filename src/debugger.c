@@ -1,6 +1,5 @@
-/* TODO: 1. Add 'key needs to be pressed' window in state view
- *       2. Add breakpoints and a 'add breakpoint' window to state view
- *       3. Separate status_view and assembly_view from debugger.c
+/* TODO: 1. Add breakpoints and a 'add breakpoint' window to state view
+ *       2. Separate status_view and assembly_view from debugger.c
  */
 #include "debugger.h"
 
@@ -463,6 +462,11 @@ void set_message(const char *message) {
     wborder(message_win, 0, 0, 0, 0, 0, 0, 0, 0);
     mvwaddstr(message_win, 1, 1, message);
     delwin(message_win);
+    wrefresh(message_view);
+}
+
+void clear_message_view() {
+    wclear(message_view);
     wrefresh(message_view);
 }
 

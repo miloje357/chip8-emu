@@ -138,4 +138,17 @@ void scroll_by(ScrollUnit unit, int num);
  */
 void draw_state(Chip8Context *chip8);
 
+/**
+ * Displays a message in the message view
+ * @param message: message to be displayed
+ * @since 1.2.0
+ */
+void set_message(const char *message);
+
+/**
+ * Clear the message view
+ * @since 1.2.0
+ */
+void clear_message_view();
+
 #endif

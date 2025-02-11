@@ -44,18 +44,24 @@ unsigned char get_key(bool *is_key_pressed, Flag flag) {
         return KEYBOARD_UNSET;
     }
     // KEYBOARD_BLOCKING
+    if (get_debugging() == GRAPHIC_DEBUGGING) {
+        set_message("Press a key (use Enter to skip)");
+    }
     int key = KEYBOARD_UNSET;
     while (key == KEYBOARD_UNSET) {
         handle_win_size(get_video_mem(), get_hi_res());
-        key = getch();
-        if (key == '\n' && get_debugging() == GRAPHIC_DEBUGGING)
-            return KEYBOARD_UNSET;
-        key = translate(key);
         // Beacuase every non-blocking keyboard signal is a blocking one in
         // graphic debugging mode, there must be a way to get the "no key
         // pressed" action
+        key = getch();
+        if (get_debugging() == GRAPHIC_DEBUGGING && key == '\n') {
+            clear_message_view();
+            return KEYBOARD_UNSET;
+        }
+        key = translate(key);
         usleep(10);
     }
+    if (get_debugging() == GRAPHIC_DEBUGGING) clear_message_view();
     return key;
 }
 
