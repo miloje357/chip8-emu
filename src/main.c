@@ -85,6 +85,10 @@ void handle_debug_controls() {
             reset_graphics(get_video_mem(), get_hi_res(), false);
             break;
         }
+        if (key == ctrl('b')) {
+            add_breakpoint();
+            continue;
+        }
         switch (key) {
             case 'j':
                 scroll_by(LINE, (num_lines != 0) ? num_lines : 1);
@@ -270,7 +274,7 @@ int main(int argc, char *argv[]) {
         printf("Exiting...\n");
         return 1;
     }
-    set_assembly(program, has_quirks);
+    init_assembly(program, has_quirks);
     fclose(program);
 
     while (get_debugging() == CONSOLE_DEBUGGING) {
@@ -289,6 +293,8 @@ int main(int argc, char *argv[]) {
     int tick_count = 0;
     while (flag != EXIT) {
         handle_win_size(get_video_mem(), get_hi_res());
+        // BUG: Jumps to the previous instruction if it was an jump
+        check_breakpoints(get_chip8()->pc);
 
         if (get_debugging() == GRAPHIC_DEBUGGING) {
             draw_state(get_chip8());

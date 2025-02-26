@@ -6,6 +6,11 @@
 #include <string.h>
 
 #include "dasm.h"
+#include "state_view.h"
+#include "tui.h"
+
+#define MAX_NUM_BREAKPOINTS 20
+#define INST_STARTX 6
 
 #define AV_REFRESH()                                            \
     prefresh(assembly_view, first_row, 0, av_starty, av_startx, \
@@ -16,6 +21,13 @@
 #define TO_FIRST_LABELED(up) \
     while (first_row >= 0 && \
            mvwinch(assembly_view, first_row += ((up) ? -1 : 1), 5) != ' ')
+#define DRAW_BREAKPOINT(row)                        \
+    wattron(assembly_view, COLOR_PAIR(BREAKPOINT)); \
+    mvwaddstr(assembly_view, row, 1, "  ⬤  ");      \
+    wattroff(assembly_view, COLOR_PAIR(BREAKPOINT));
+// NOTE: Works both with directives and instructions
+#define IS_ROW_LABELED(row) \
+    ((char)mvwinch(assembly_view, row, INST_STARTX) == 'L')
 
 typedef enum {
     NOT_SELECTED,
@@ -24,6 +36,7 @@ typedef enum {
     REGISTER,
     IMMEDIATE,
     ADDRESS,
+    BREAKPOINT,
 } SyntaxColor;
 
 AsmStatement *assembly;
@@ -35,8 +48,12 @@ int av_startx, av_starty, av_width, av_height;
 size_t num_rows;
 int first_row = 0;
 
-void set_assembly(FILE *src, bool has_quirks) {
+size_t num_breakpoints;
+int breakpoints[MAX_NUM_BREAKPOINTS] = {-1};
+
+void init_assembly(FILE *src, bool has_quirks) {
     assembly = disassemble(src, &num_statements, has_quirks);
+    memset(breakpoints, -1, MAX_NUM_BREAKPOINTS * sizeof(int));
 }
 
 void free_assembly() {
@@ -67,11 +84,9 @@ SyntaxColor get_arg_color(char *arg) {
 }
 
 int draw_statement(int row, AsmStatement stat, bool is_selected) {
-    int x = 1;
-    wmove(assembly_view, row, x);
+    wmove(assembly_view, row, INST_STARTX);
 
     if (stat.is_directive) {
-        wprintw(assembly_view, "%3d ", row + 1);
         // Draw label
         if (!is_selected) wattron(assembly_view, COLOR_PAIR(ADDRESS));
         wprintw(assembly_view, "%s: ", stat.label);
@@ -91,17 +106,15 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
 
     // Draw label
     if (strlen(stat.label) != 0) {
-        wprintw(assembly_view, "%3d ", row + 1);
-        mvwprintw(assembly_view, row + 1, x, "%3d ", row + 2);
+        wmove(assembly_view, row + 1, INST_STARTX);
         wattron(assembly_view, COLOR_PAIR(ADDRESS));
         wprintw(assembly_view, "%s:", stat.label);
         wattroff(assembly_view, COLOR_PAIR(ADDRESS));
 
         row += 2;
-        wmove(assembly_view, row, x);
+        wmove(assembly_view, row, INST_STARTX);
     }
 
-    wprintw(assembly_view, "%3d ", row + 1);
     if (is_selected) wattron(assembly_view, COLOR_PAIR(SELECTED));
     // Draw name
     if (!is_selected) wattron(assembly_view, COLOR_PAIR(NAME));
@@ -130,6 +143,24 @@ int draw_statement(int row, AsmStatement stat, bool is_selected) {
     return row;
 }
 
+void draw_line_numbers() {
+    int curr_bp_index = num_breakpoints - 1;
+    for (int row = num_rows - 1; row >= 0; row--) {
+        if (curr_bp_index >= 0 && breakpoints[curr_bp_index] == row - 2 &&
+            IS_ROW_LABELED(row - 1)) {
+            DRAW_BREAKPOINT(row);
+            curr_bp_index--;
+            continue;
+        }
+        if (curr_bp_index >= 0 && breakpoints[curr_bp_index] == row) {
+            DRAW_BREAKPOINT(row);
+            curr_bp_index--;
+            continue;
+        }
+        mvwprintw(assembly_view, row, 1, "%4d ", row + 1);
+    }
+}
+
 void draw_assembly() {
     int row = 0;
     unsigned short addr = 0x200;
@@ -143,6 +174,7 @@ void draw_assembly() {
             addr += 2;
     }
 
+    draw_line_numbers();
     mvwvline(assembly_view, 0, 0, 0, num_rows + av_height);
     AV_REFRESH();
 }
@@ -156,6 +188,7 @@ void init_assembly_graphics() {
     init_pair(REGISTER, COLOR_RED, -1);
     init_pair(IMMEDIATE, COLOR_BLUE, -1);
     init_pair(ADDRESS, COLOR_YELLOW, -1);
+    init_pair(BREAKPOINT, COLOR_RED, -1);
     num_rows = get_num_rows();
     assembly_view = newpad(num_rows + av_height, av_width);
     draw_assembly();
@@ -242,3 +275,76 @@ void scroll_by(ScrollUnit unit, int num) {
 
     AV_REFRESH();
 }
+
+// TODO: Add label breakpoints
+int parse_bp_input(char *inp, size_t len, int *label_offset) {
+    if (inp == NULL) return -1;
+    char *end;
+    int row = strtol(inp, &end, 0);
+    if (end == inp || *end != '\0') {
+        set_message("Invalid input: Not a number");
+        return -1;
+    }
+    row--;
+    if (row < 0 || row >= num_rows) {
+        set_message("Invalid input: Out of bounds");
+        return -1;
+    }
+
+    *label_offset = 0;
+    if (IS_ROW_LABELED(row - 1)) {
+        *label_offset = 2;
+    }
+    if (IS_ROW_LABELED(row)) {
+        *label_offset = 1;
+    }
+    return row - *label_offset;
+}
+
+void insert_breakpoint(int row) {
+    int curr_row_index;
+    for (curr_row_index = 0;
+         breakpoints[curr_row_index] != -1 && breakpoints[curr_row_index] < row;
+         curr_row_index++);
+    if (breakpoints[curr_row_index] == row) return;
+    num_breakpoints++;
+    memmove(&breakpoints[curr_row_index + 1], &breakpoints[curr_row_index],
+            (num_breakpoints - curr_row_index) * sizeof(int));
+    breakpoints[curr_row_index] = row;
+}
+
+void add_breakpoint() {
+    if (num_breakpoints >= MAX_NUM_BREAKPOINTS) {
+        set_message("Reached maximum amount of breakpoints");
+        return;
+    }
+    size_t bp_strlen;
+    int offset;
+    char *bp_input = get_from_field("Add breakpoint", &bp_strlen);
+    int row = parse_bp_input(bp_input, bp_strlen, &offset);
+    if (row == -1) return;
+    free(bp_input);
+    insert_breakpoint(row);
+    DRAW_BREAKPOINT(row + offset);
+    AV_REFRESH();
+}
+
+void check_breakpoints(unsigned short pc) {
+    int curr_row = addr_to_row(pc);
+    int left = 0, right = num_breakpoints - 1;
+    while (left <= right) {
+        int mid = (left + right) / 2;
+        if (breakpoints[mid] == curr_row) {
+            // TODO: 'Reached a breakpoint' message in state_view
+            set_debugging(GRAPHIC_DEBUGGING);
+            reset_graphics(get_video_mem(), get_hi_res(), true);
+            return;
+        } else if (breakpoints[mid] < curr_row) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+}
+
+// TODO: Add delete_breakpoint()

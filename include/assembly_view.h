@@ -20,12 +20,13 @@ typedef enum { LINE, LABEL, TOP, BOTTOM } ScrollUnit;
 void set_assembly_dimens(int y, int x, int h, int w);
 
 /**
- * Disassembles the current program and loads it to memory
+ * Disassembles the current program and loads it to memory.
+ * Also inits the breakpoints
  * @param src: The source program
  * @param has_quirks: true if the emulator runs with Super Chip8 quirks
  * @since 1.2.0
  */
-void set_assembly(FILE *src, bool has_quirks);
+void init_assembly(FILE *src, bool has_quirks);
 
 /**
  * Frees the assembly memory
@@ -33,8 +34,16 @@ void set_assembly(FILE *src, bool has_quirks);
  */
 void free_assembly();
 
-// TODO: Write docs
+/**
+ * Runs all necessary routines for assembly view
+ * @since 1.2.0
+ */
 void init_assembly_graphics();
+
+/**
+ * Frees resources used by the assembly view
+ * @since 1.2.0
+ */
 void delete_assembly_graphics();
 
 /**
@@ -51,5 +60,19 @@ void set_curr_inst(unsigned short pc);
  * @since 1.2.0
  */
 void scroll_by(ScrollUnit unit, int num);
+
+/**
+ * Displays an input field in state view for a row of a new breakpoint
+ * @since 1.2.0
+ */
+void add_breakpoint();
+
+/**
+ * Enters graphic debugging mode if a breakpoint has been reached
+ * @param pc: the program counter of the current Chip8Context (so the
+ *            program knows what is the latest executed instruction)
+ * @since 1.2.0
+ */
+void check_breakpoints(unsigned short pc);
 
 #endif

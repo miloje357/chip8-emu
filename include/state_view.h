@@ -106,4 +106,14 @@ void set_message(const char *message);
  */
 void clear_message_view();
 
+/**
+ * Displays an input field in state view
+ * @param title: title displayed above the input field
+ * @param len: the length of the returned string
+ * @return: a string entered in the input field
+ * @note: the returned string must be freed
+ * @since 1.2.0
+ */
+char *get_from_field(const char *title, size_t *len);
+
 #endif

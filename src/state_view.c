@@ -217,7 +217,8 @@ void draw_state(Chip8Context *chip8) {
     has_been_init = true;
 }
 
-// NOTE: Text doesn't wrap
+// TODO: Add wraping text
+// TODO: Add optional pause
 void set_message(const char *message) {
     wclear(message_view);
     SET_MV_BG();
@@ -248,7 +249,7 @@ char *get_from_field(const char *title, size_t *len) {
     WINDOW *message_win =
         derwin(message_view, 3, mv_width - 2, (mv_height - 3) / 2, 1);
     nodelay(message_win, false);
-    keypad(message_win, true);
+    keypad(message_win, false);
     wclear(message_win);
     wborder(message_win, 0, 0, 0, 0, 0, 0, 0, 0);
     mvwaddstr(message_win, 0, 1, title);
@@ -257,9 +258,15 @@ char *get_from_field(const char *title, size_t *len) {
     int key;
     *len = 0;
     wmove(message_win, 1, 1);
+    curs_set(1);
     while ((key = wgetch(message_win)) != '\n') {
+        if (key == '\x1b') {
+            free(buffer);
+            buffer = NULL;
+            break;
+        }
         curs_set(1);
-        if (key == KEY_BACKSPACE) {
+        if (key == '\b' || key == KEY_BACKSPACE || key == 127) {
             if (*len <= 0) continue;
             mvwaddch(message_win, 1, *len, ' ');
             wmove(message_win, 1, *len);
@@ -279,6 +286,7 @@ char *get_from_field(const char *title, size_t *len) {
     curs_set(0);
     delwin(message_win);
     wclear(message_view);
+    wrefresh(message_view);
     return buffer;
 }
 
