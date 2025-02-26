@@ -62,10 +62,12 @@ void set_curr_inst(unsigned short pc);
 void scroll_by(ScrollUnit unit, int num);
 
 /**
- * Displays an input field in state view for a row of a new breakpoint
+ * Displays an input field in state view. When a row line number is entered it
+ * toggles the breakpoint (if there was no breakpoint, it will add it, otherwise
+ * it will remove it)
  * @since 1.2.0
  */
-void add_breakpoint();
+void toggle_breakpoint();
 
 /**
  * Enters graphic debugging mode if a breakpoint has been reached

@@ -21,10 +21,13 @@
 #define TO_FIRST_LABELED(up) \
     while (first_row >= 0 && \
            mvwinch(assembly_view, first_row += ((up) ? -1 : 1), 5) != ' ')
-#define DRAW_BREAKPOINT(row)                        \
-    wattron(assembly_view, COLOR_PAIR(BREAKPOINT)); \
-    mvwaddstr(assembly_view, row, 1, "  ⬤  ");      \
-    wattroff(assembly_view, COLOR_PAIR(BREAKPOINT));
+#define DRAW_BREAKPOINT(row, exists)                     \
+    if (exists) {                                        \
+        wattron(assembly_view, COLOR_PAIR(BREAKPOINT));  \
+        mvwaddstr(assembly_view, row, 1, "  ⬤  ");       \
+        wattroff(assembly_view, COLOR_PAIR(BREAKPOINT)); \
+    } else                                               \
+        mvwprintw(assembly_view, row, 1, "%4d ", row + 1);
 // NOTE: Works both with directives and instructions
 #define IS_ROW_LABELED(row) \
     ((char)mvwinch(assembly_view, row, INST_STARTX) == 'L')
@@ -148,12 +151,12 @@ void draw_line_numbers() {
     for (int row = num_rows - 1; row >= 0; row--) {
         if (curr_bp_index >= 0 && breakpoints[curr_bp_index] == row - 2 &&
             IS_ROW_LABELED(row - 1)) {
-            DRAW_BREAKPOINT(row);
+            DRAW_BREAKPOINT(row, true);
             curr_bp_index--;
             continue;
         }
         if (curr_bp_index >= 0 && breakpoints[curr_bp_index] == row) {
-            DRAW_BREAKPOINT(row);
+            DRAW_BREAKPOINT(row, true);
             curr_bp_index--;
             continue;
         }
@@ -301,19 +304,27 @@ int parse_bp_input(char *inp, size_t len, int *label_offset) {
     return row - *label_offset;
 }
 
-void insert_breakpoint(int row) {
+// returns false if the breakpoint already exists
+bool insert_or_delete_breakpoint(int row) {
     int curr_row_index;
     for (curr_row_index = 0;
          breakpoints[curr_row_index] != -1 && breakpoints[curr_row_index] < row;
          curr_row_index++);
-    if (breakpoints[curr_row_index] == row) return;
+    if (breakpoints[curr_row_index] == row) {
+        num_breakpoints--;
+        memmove(&breakpoints[curr_row_index], &breakpoints[curr_row_index + 1],
+                (num_breakpoints - curr_row_index) * sizeof(int));
+        return false;
+    }
     num_breakpoints++;
     memmove(&breakpoints[curr_row_index + 1], &breakpoints[curr_row_index],
             (num_breakpoints - curr_row_index) * sizeof(int));
     breakpoints[curr_row_index] = row;
+    return true;
 }
 
-void add_breakpoint() {
+// TODO: Change to toggle_breakpoints
+void toggle_breakpoint() {
     if (num_breakpoints >= MAX_NUM_BREAKPOINTS) {
         set_message("Reached maximum amount of breakpoints");
         return;
@@ -324,8 +335,8 @@ void add_breakpoint() {
     int row = parse_bp_input(bp_input, bp_strlen, &offset);
     if (row == -1) return;
     free(bp_input);
-    insert_breakpoint(row);
-    DRAW_BREAKPOINT(row + offset);
+    bool bp_inserted = insert_or_delete_breakpoint(row);
+    DRAW_BREAKPOINT(row + offset, bp_inserted);
     AV_REFRESH();
 }
 
@@ -346,5 +357,3 @@ void check_breakpoints(unsigned short pc) {
         }
     }
 }
-
-// TODO: Add delete_breakpoint()

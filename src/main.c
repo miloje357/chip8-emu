@@ -86,7 +86,7 @@ void handle_debug_controls() {
             break;
         }
         if (key == ctrl('b')) {
-            add_breakpoint();
+            toggle_breakpoint();
             continue;
         }
         switch (key) {
@@ -294,6 +294,7 @@ int main(int argc, char *argv[]) {
     while (flag != EXIT) {
         handle_win_size(get_video_mem(), get_hi_res());
         // BUG: Jumps to the previous instruction if it was an jump
+        //      (run flightrunner.ch8 and add breakpoint 28)
         check_breakpoints(get_chip8()->pc);
 
         if (get_debugging() == GRAPHIC_DEBUGGING) {
