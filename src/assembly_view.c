@@ -15,12 +15,19 @@
 #define AV_REFRESH()                                            \
     prefresh(assembly_view, first_row, 0, av_starty, av_startx, \
              av_starty + av_height - 1, av_startx + av_width - 1)
+
 #define IS_INST_LABELED(stat) \
     (!((stat).is_directive) && strlen((stat).label) != 0)
+
 #define ABS(x) ((x > 0) ? x : -x)
+
+// NOTE: Works both with directives and instructions
+#define IS_ROW_LABELED(row) \
+    ((char)mvwinch(assembly_view, row, INST_STARTX) == 'L')
+
 #define TO_FIRST_LABELED(up) \
-    while (first_row >= 0 && \
-           mvwinch(assembly_view, first_row += ((up) ? -1 : 1), 5) != ' ')
+    while (first_row >= 0 && !IS_ROW_LABELED(first_row += ((up) ? -1 : 1)));
+
 #define DRAW_BREAKPOINT(row, exists)                     \
     if (exists) {                                        \
         wattron(assembly_view, COLOR_PAIR(BREAKPOINT));  \
@@ -28,9 +35,6 @@
         wattroff(assembly_view, COLOR_PAIR(BREAKPOINT)); \
     } else                                               \
         mvwprintw(assembly_view, row, 1, "%4d ", row + 1);
-// NOTE: Works both with directives and instructions
-#define IS_ROW_LABELED(row) \
-    ((char)mvwinch(assembly_view, row, INST_STARTX) == 'L')
 
 typedef enum {
     NOT_SELECTED,
@@ -279,7 +283,6 @@ void scroll_by(ScrollUnit unit, int num) {
     AV_REFRESH();
 }
 
-// TODO: Add label breakpoints
 int parse_bp_input(char *inp, size_t len, int *label_offset) {
     if (inp == NULL) return -1;
     char *end;
@@ -323,7 +326,6 @@ bool insert_or_delete_breakpoint(int row) {
     return true;
 }
 
-// TODO: Change to toggle_breakpoints
 void toggle_breakpoint() {
     if (num_breakpoints >= MAX_NUM_BREAKPOINTS) {
         set_message("Reached maximum amount of breakpoints");

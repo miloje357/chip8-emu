@@ -1,5 +1,3 @@
-/* TODO: 1. Add breakpoints and a 'add breakpoint' window to state view
- */
 #include "state_view.h"
 
 #include <assert.h>
