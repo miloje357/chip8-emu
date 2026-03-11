@@ -6,6 +6,8 @@
 # chip8-emu
 A ncurses CHIP-8 emulator developed for educational purposes.
 
+*NOTE: A new chip8 emulator is in development. The goal is to make a multiple frontend (TUI, SDL), mutiple backend (simple interpreter, LLVM) emulator with other features (debugger). See [chip8pp](https://github.com/miloje357/chip8pp).*
+
 ## Notes
  - **KEYBOARD INPUT IS TERRIBLE**
  - Implements a flash, not a buzzer
